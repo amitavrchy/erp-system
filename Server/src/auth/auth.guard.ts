@@ -49,6 +49,7 @@ export class AuthGuard implements CanActivate {
     req.actor = { userId: claims.sub, orgId: claims.orgId, role: member.role };
     const readModules: Partial<Record<MembershipRole, string[]>> = {
       SALES: [
+        'crm',
         'me',
         'orgs',
         'contacts',

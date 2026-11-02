@@ -49,6 +49,10 @@ export class ListDto {
   to?: string;
 }
 export class MasterDto {
+  @ValidateIf((_o,v)=>v!==undefined) @IsIn(['LEAD','PROSPECT','CUSTOMER','PARTNER','INACTIVE']) lifecycle?:string;
+  @ValidateIf((_o,v)=>v!==undefined) @IsString() @MaxLength(60) source?:string;
+  @ValidateIf((_o,v)=>v!==undefined) @IsString() @MaxLength(100) ownerId?:string;
+  @ValidateIf((_o,v)=>v!==undefined) @IsObject() customFields?:Record<string,unknown>;
   @ValidateIf((_object, value) => value !== undefined)
   @IsObject()
   attrsJson?: Record<string, string>;

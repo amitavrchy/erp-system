@@ -12,6 +12,8 @@ import { WorkflowsService } from './erp/workflows.service.js';
 import { ReportsService } from './erp/reports.service.js';
 import { ErpController } from './erp/erp.controller.js';
 import { HealthController } from './health.controller.js';
+import { CrmController } from './crm/crm.controller.js';
+import { CrmService } from './crm/crm.service.js';
 
 @Module({
   imports: [
@@ -19,7 +21,7 @@ import { HealthController } from './health.controller.js';
     PrismaModule,
     JwtModule.register({}),
   ],
-  controllers: [AppController, AuthController, HealthController, ErpController],
+  controllers: [AppController, AuthController, HealthController, CrmController, ErpController],
   providers: [
     AppService,
     AuthService,
@@ -27,6 +29,7 @@ import { HealthController } from './health.controller.js';
     CatalogService,
     WorkflowsService,
     ReportsService,
+    CrmService,
   ],
 })
 export class AppModule {}

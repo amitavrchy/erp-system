@@ -8,11 +8,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { Actor } from '../auth/auth.guard.js';
 import type { ListDto, MasterDto } from '../common/dto.js';
+import { CrmService } from '../crm/crm.service.js';
 
 const resources = {
   contacts: {
     model: 'contact',
-    fields: ['name', 'email', 'phone', 'title', 'companyId', 'tags'],
+    fields: ['name', 'email', 'phone', 'title', 'companyId', 'tags','lifecycle','source','ownerId','customFields'],
     roles: ['SALES'],
     search: 'name',
   },
@@ -68,7 +69,7 @@ type Delegate = {
 };
 @Injectable()
 export class CatalogService {
-  constructor(private db: PrismaService) {}
+  constructor(private db: PrismaService,private crm:CrmService) {}
   config(resource: string) {
     if (!Object.hasOwn(resources, resource)) throw new NotFoundException();
     return resources[resource as Resource];
@@ -174,6 +175,11 @@ export class CatalogService {
     if (!id && resource === 'tax-rates' && dto.rateBps === undefined)
       throw new BadRequestException('Tax rate is required');
     return this.db.$transaction(async (tx) => {
+      if(resource==='contacts'){
+        await this.crm.validateLinks(tx,a,{ownerId:dto.ownerId});
+        if(dto.customFields!==undefined)await this.crm.validateCustom(tx,a,'contacts',dto.customFields);
+        if(input.ownerId==='')input.ownerId=null;
+      }
       if (
         dto.companyId &&
         !(await tx.company.findFirst({

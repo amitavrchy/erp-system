@@ -50,6 +50,17 @@ enum ActivityType {
 }
 
 model Organization {
+  crmPipelines  CrmPipeline[]
+  leads         Lead[]
+  deals         Deal[]
+  crmTasks      CrmTask[]
+  crmActivities CrmActivity[]
+  campaigns     Campaign[]
+  tickets       SupportTicket[]
+  segments      CrmSegment[]
+  automations   CrmAutomation[]
+  customFields  CrmCustomField[]
+
   invoiceEmailSubject String           @default("Invoice {{number}} from {{organization}}")
   invoiceEmailBody    String           @default("Thank you for your business. Please find your invoice details attached.")
   bills               Bill[]
@@ -139,6 +150,16 @@ model Company {
 }
 
 model Contact {
+  lifecycle     String          @default("CUSTOMER")
+  source        String          @default("MANUAL")
+  ownerId       String?
+  customFields  Json?
+  leads         Lead[]
+  deals         Deal[]
+  crmTasks      CrmTask[]
+  crmActivities CrmActivity[]
+  tickets       SupportTicket[]
+
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -442,4 +463,242 @@ model Bill {
 
   @@unique([organizationId, number])
   @@index([organizationId, status])
+}
+
+model CrmPipeline {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  stages         CrmStage[]
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, name])
+}
+
+model CrmStage {
+  id          String      @id @default(cuid())
+  pipelineId  String
+  pipeline    CrmPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  name        String
+  position    Int
+  probability Int         @default(0)
+  outcome     String      @default("OPEN")
+  deals       Deal[]
+
+  @@unique([pipelineId, name])
+}
+
+model Lead {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  name           String
+  email          String?
+  phone          String?
+  company        String?
+  source         String        @default("WEBSITE")
+  status         String        @default("NEW")
+  score          Int           @default(0)
+  value          Decimal       @default(0) @db.Decimal(14, 2)
+  ownerId        String?
+  tags           String[]
+  notes          String?
+  customFields   Json?
+  contactId      String?
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  deals          Deal[]
+  tasks          CrmTask[]
+  activities     CrmActivity[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, createdAt])
+}
+
+model Deal {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  name           String
+  stageId        String
+  stage          CrmStage      @relation(fields: [stageId], references: [id])
+  contactId      String?
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  value          Decimal       @default(0) @db.Decimal(14, 2)
+  ownerId        String?
+  expectedClose  DateTime?
+  closedAt       DateTime?
+  lostReason     String?
+  notes          String?
+  customFields   Json?
+  quoteId        String?       @unique
+  tasks          CrmTask[]
+  activities     CrmActivity[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId, stageId, createdAt])
+}
+
+model CrmTask {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  status         String       @default("OPEN")
+  priority       String       @default("MEDIUM")
+  type           String       @default("FOLLOW_UP")
+  ownerId        String?
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  dealId         String?
+  deal           Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  dueAt          DateTime?
+  completedAt    DateTime?
+  notes          String?
+  automationKey  String?      @unique
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status, dueAt])
+}
+
+model CrmActivity {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  type           String       @default("CALL")
+  status         String       @default("SCHEDULED")
+  ownerId        String?
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  dealId         String?
+  deal           Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  startsAt       DateTime
+  endsAt         DateTime?
+  outcome        String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, startsAt])
+}
+
+model Campaign {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  channel        String       @default("EMAIL")
+  status         String       @default("DRAFT")
+  segmentId      String?
+  segment        CrmSegment?  @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  budget         Decimal      @default(0) @db.Decimal(14, 2)
+  spent          Decimal      @default(0) @db.Decimal(14, 2)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  subject        String?
+  body           String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model SupportTicket {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  name           String
+  contactId      String?
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ownerId        String?
+  status         String        @default("OPEN")
+  priority       String        @default("MEDIUM")
+  category       String        @default("GENERAL")
+  channel        String        @default("EMAIL")
+  dueAt          DateTime?
+  resolvedAt     DateTime?
+  notes          String?
+  resolution     String?
+  replies        TicketReply[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, priority])
+}
+
+model TicketReply {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId     String
+  body       String
+  isInternal Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+}
+
+model CrmSegment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  lifecycle      String?
+  tag            String?
+  source         String?
+  ownerId        String?
+  campaigns      Campaign[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+}
+
+model CrmAutomation {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  trigger        String
+  action         String       @default("CREATE_TASK")
+  taskTitle      String
+  dueDays        Int          @default(1)
+  ownerId        String?
+  enabled        Boolean      @default(true)
+  runCount       Int          @default(0)
+  lastRunAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, trigger, enabled])
+}
+
+model CrmCustomField {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  key            String
+  entity         String
+  type           String       @default("TEXT")
+  options        String[]
+  required       Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, entity, key])
 }
