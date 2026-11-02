@@ -210,6 +210,7 @@ export function canRead(role: Role, endpoint: string) {
   endpoint = ['movements', 'adjustments'].includes(endpoint) ? 'stock' : endpoint;
   if (role === 'SALES')
     return [
+      'crm',
       'contacts',
       'companies',
       'products',

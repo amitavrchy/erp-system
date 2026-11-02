@@ -154,7 +154,7 @@ export function CrmOverview({ analytics = false }: { analytics?: boolean }) {
                       <div className="crm-progress">
                         <span
                           style={{
-                            width: `${Math.max(3, (s._count!.deals / Math.max(...d.stages.map((s) => s._count?.deals ?? 0), 1)) * 100)}%`,
+                            width: `${Math.max(0, (s._count!.deals / Math.max(...d.stages.map((s) => s._count?.deals ?? 0), 1)) * 100)}%`,
                             background:
                               i === d.stages.length - 2 ? 'var(--green)' : 'var(--accent)',
                           }}

@@ -5,10 +5,10 @@ import { Settings } from '@/components/settings';
 import { Reports, Accounts } from '@/components/reports';
 import { MasterDetail } from '@/components/master-detail';
 import { notFound } from 'next/navigation';
-import { CrmWorkspace,crmViews } from '@/components/crm/crm-workspace';
+import { CrmWorkspace } from '@/components/crm/crm-workspace';
 import { CrmNav } from '@/components/crm/crm-nav';
 import { ContactContext } from '@/components/crm/contact-context';
-import { crmKinds } from '@/lib/crm';
+import { crmKinds, crmViews } from '@/lib/crm';
 
 export const instant = false;
 const routes: Record<string, string> = {
@@ -32,14 +32,27 @@ export default async function Workspace({ params }: { params: Promise<{ slug?: s
   if (slug.join('/') === 'settings') return <Settings />;
   if (slug.join('/') === 'reports') return <Reports />;
   if (slug.join('/') === 'finance/accounts') return <Accounts />;
-  if(slug[0]==='crm'&&slug.length<=3){
-    const view=slug[1]??'overview';
-    if(crmViews.includes(view)){
-      if(slug[2]&&!crmKinds.some(k=>k===view))notFound();
-      return <CrmWorkspace section={view} id={slug[2]}/>;
+  if (slug[0] === 'crm' && slug.length <= 3) {
+    const view = slug[1] ?? 'overview';
+    if (crmViews.includes(view)) {
+      if (slug[2] && !crmKinds.some((k) => k === view)) notFound();
+      return <CrmWorkspace section={view} id={slug[2]} />;
     }
-    if(view==='contacts'&&slug[2])return <><CrmNav/><MasterDetail moduleKey="contacts" id={slug[2]}/><ContactContext id={slug[2]}/></>;
-    if(['contacts','companies'].includes(view)&&!slug[2])return <><CrmNav/><ListPage moduleKey={view}/></>;
+    if (view === 'contacts' && slug[2])
+      return (
+        <>
+          <CrmNav />
+          <MasterDetail moduleKey="contacts" id={slug[2]} />
+          <ContactContext id={slug[2]} />
+        </>
+      );
+    if (['contacts', 'companies'].includes(view) && !slug[2])
+      return (
+        <>
+          <CrmNav />
+          <ListPage moduleKey={view} />
+        </>
+      );
   }
   const key = routes[slug.slice(0, 2).join('/')];
   if (!key || slug.length > 3) notFound();

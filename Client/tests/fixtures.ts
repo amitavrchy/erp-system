@@ -30,6 +30,7 @@ export async function cleanupBrowserFixtures() {
       u.memberships.filter((m) => m.role === 'OWNER').map((m) => m.organizationId),
     );
     await db.bill.deleteMany({ where: { organizationId: { in: orgIds } } });
+    await db.deal.deleteMany({ where: { organizationId: { in: orgIds } } });
     await db.organization.deleteMany({ where: { id: { in: orgIds } } });
     await db.user.deleteMany({ where: { id: { in: users.map((u) => u.id) } } });
     emails.clear();

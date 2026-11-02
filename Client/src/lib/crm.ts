@@ -133,6 +133,7 @@ export const crmKinds: CrmKind[] = [
   'automations',
   'fields',
 ];
+export const crmViews = ['overview', 'analytics', 'calendar', 'pipelines', 'import', ...crmKinds];
 export const crmSections = [
   ['Overview', 'overview'],
   ['Leads', 'leads'],

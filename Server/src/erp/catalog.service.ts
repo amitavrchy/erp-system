@@ -13,7 +13,18 @@ import { CrmService } from '../crm/crm.service.js';
 const resources = {
   contacts: {
     model: 'contact',
-    fields: ['name', 'email', 'phone', 'title', 'companyId', 'tags','lifecycle','source','ownerId','customFields'],
+    fields: [
+      'name',
+      'email',
+      'phone',
+      'title',
+      'companyId',
+      'tags',
+      'lifecycle',
+      'source',
+      'ownerId',
+      'customFields',
+    ],
     roles: ['SALES'],
     search: 'name',
   },
@@ -69,7 +80,10 @@ type Delegate = {
 };
 @Injectable()
 export class CatalogService {
-  constructor(private db: PrismaService,private crm:CrmService) {}
+  constructor(
+    private db: PrismaService,
+    private crm: CrmService,
+  ) {}
   config(resource: string) {
     if (!Object.hasOwn(resources, resource)) throw new NotFoundException();
     return resources[resource as Resource];
@@ -80,6 +94,16 @@ export class CatalogService {
   async list(a: Actor, resource: string, q: ListDto) {
     const config = this.config(resource);
     const where = {
+      ...(resource === 'contacts'
+        ? {
+            ...(q.lifecycle ? { lifecycle: q.lifecycle } : {}),
+            ...(q.source ? { source: q.source } : {}),
+            ...(q.tag ? { tags: { has: q.tag } } : {}),
+            ...(q.ownerId
+              ? { ownerId: q.ownerId === 'me' ? a.userId : q.ownerId }
+              : {}),
+          }
+        : {}),
       organizationId: a.orgId,
       ...(q.q
         ? {
@@ -175,10 +199,21 @@ export class CatalogService {
     if (!id && resource === 'tax-rates' && dto.rateBps === undefined)
       throw new BadRequestException('Tax rate is required');
     return this.db.$transaction(async (tx) => {
-      if(resource==='contacts'){
-        await this.crm.validateLinks(tx,a,{ownerId:dto.ownerId});
-        if(dto.customFields!==undefined)await this.crm.validateCustom(tx,a,'contacts',dto.customFields);
-        if(input.ownerId==='')input.ownerId=null;
+      if (resource === 'contacts') {
+        await this.crm.validateLinks(tx, a, { ownerId: dto.ownerId });
+        const original = id
+          ? await tx.contact.findFirst({
+              where: { id, organizationId: a.orgId },
+              select: { customFields: true },
+            })
+          : null;
+        await this.crm.validateCustom(
+          tx,
+          a,
+          'contacts',
+          dto.customFields ?? original?.customFields,
+        );
+        if (input.ownerId === '') input.ownerId = null;
       }
       if (
         dto.companyId &&

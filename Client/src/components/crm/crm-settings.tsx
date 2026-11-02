@@ -353,9 +353,18 @@ function parseCsv(text: string) {
   return rows;
 }
 export function CrmImport() {
+  const meta = useCrmMeta();
+  const fields = meta.data?.fields.filter((f) => f.entity === 'contacts') ?? [];
   const { orgId, user } = useWorkspace();
   const cache = useQueryClient();
-  const [rows, setRows] = useState<{ name: string; email?: string; phone?: string }[]>([]);
+  const [rows, setRows] = useState<
+    {
+      name: string;
+      email?: string;
+      phone?: string;
+      customFields?: Record<string, string | number>;
+    }[]
+  >([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number }>();
@@ -397,7 +406,7 @@ export function CrmImport() {
               <label>
                 Choose a CSV file
                 <input
-                  disabled={!allowed}
+                  disabled={!allowed || meta.isPending}
                   aria-label="Contacts CSV file"
                   type="file"
                   accept=".csv,text/csv"
@@ -419,7 +428,23 @@ export function CrmImport() {
                         if (name.length < 2) throw new Error(`Row ${i + 2} needs a contact name`);
                         const email = cells[headers.indexOf('email')]?.trim();
                         const phone = cells[headers.indexOf('phone')]?.trim();
-                        return { name, ...(email ? { email } : {}), ...(phone ? { phone } : {}) };
+                        const customFields: Record<string, string | number> = {};
+                        for (const f of fields) {
+                          const value = cells[headers.indexOf(`custom_${f.key}`)]?.trim();
+                          if (f.required && !value)
+                            throw new Error(`Row ${i + 2} needs custom_${f.key}`);
+                          if (value) {
+                            if (f.type === 'NUMBER' && !Number.isFinite(Number(value)))
+                              throw new Error(`Row ${i + 2} needs a number for ${f.name}`);
+                            customFields[f.key] = f.type === 'NUMBER' ? Number(value) : value;
+                          }
+                        }
+                        return {
+                          name,
+                          ...(email ? { email } : {}),
+                          ...(phone ? { phone } : {}),
+                          ...(fields.length ? { customFields } : {}),
+                        };
                       });
                       setRows(records);
                     } catch (e) {
@@ -432,6 +457,15 @@ export function CrmImport() {
                 Contacts with matching emails are skipped within this organization. Imported records
                 are marked as prospects with source Import. Existing contacts are preserved.
               </p>
+              {fields.length > 0 && (
+                <p className="muted">
+                  Custom field columns:{' '}
+                  {fields
+                    .map((f) => `custom_${f.key}${f.required ? ' (required)' : ''}`)
+                    .join(', ')}
+                  .
+                </p>
+              )}
             </>
           )}
         </div>

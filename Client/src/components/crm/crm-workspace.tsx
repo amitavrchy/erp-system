@@ -5,9 +5,8 @@ import { CrmList } from './crm-list';
 import { CrmDetail } from './crm-detail';
 import { CrmCalendar } from './crm-calendar';
 import { CrmPipelines, CrmImport } from './crm-settings';
-import { crmKinds, type CrmKind } from '@/lib/crm';
+import { type CrmKind } from '@/lib/crm';
 
-export const crmViews = ['overview', 'analytics', 'calendar', 'pipelines', 'import', ...crmKinds];
 export function CrmWorkspace({ section, id }: { section: string; id?: string }) {
   return (
     <>

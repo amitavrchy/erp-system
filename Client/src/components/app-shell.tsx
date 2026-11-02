@@ -39,9 +39,16 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
     queryKey: ['org', orgId, 'search', term],
     enabled: open && term.length >= 2,
     queryFn: async () => {
-      const resources = ['contacts', 'products', 'quotes', 'sales-orders', 'invoices'].filter((r) =>
-        canRead(user?.role ?? 'VIEWER', r),
-      );
+      const resources = [
+        'contacts',
+        'products',
+        'quotes',
+        'sales-orders',
+        'invoices',
+        'crm/leads',
+        'crm/deals',
+        'crm/tickets',
+      ].filter((r) => canRead(user?.role ?? 'VIEWER', r));
       const results = await Promise.all(
         resources.map(async (resource) => {
           const r = await api.get<PageData>(`/${resource}`, { params: { q: term, pageSize: 5 } });
@@ -90,6 +97,10 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
               </Link>
             ))}
           {[
+            { label: 'New lead', href: '/app/crm/leads?new=true', roles: ['SALES'] as const },
+            { label: 'New deal', href: '/app/crm/deals?new=true', roles: ['SALES'] as const },
+            { label: 'New task', href: '/app/crm/tasks?new=true', roles: ['SALES'] as const },
+            { label: 'New ticket', href: '/app/crm/tickets?new=true', roles: ['SALES'] as const },
             { label: 'New quote', href: '/app/sales/quotes?new=true', roles: ['SALES'] as const },
             {
               label: 'New invoice',
@@ -128,9 +139,11 @@ function CommandPalette({ open, setOpen }: { open: boolean; setOpen: (v: boolean
               className="command-item"
               onClick={() => setOpen(false)}
               href={
-                ['contacts', 'products'].includes(item.resource)
-                  ? `/app/${item.resource === 'contacts' ? 'crm/contacts' : 'inventory/products'}/${item.id}`
-                  : documentHref(item.resource, item.id)
+                item.resource.startsWith('crm/')
+                  ? `/app/${item.resource}/${item.id}`
+                  : ['contacts', 'products'].includes(item.resource)
+                    ? `/app/${item.resource === 'contacts' ? 'crm/contacts' : 'inventory/products'}/${item.id}`
+                    : documentHref(item.resource, item.id)
               }
             >
               <Search size={17} />

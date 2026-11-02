@@ -37,6 +37,7 @@ export function CrmDetail({ kind, id }: { kind: CrmKind; id: string }) {
   const [stageId, setStageId] = useState('');
   const [createDeal, setCreateDeal] = useState(true);
   const [customValues, setCustomValues] = useState<Record<string, string>>({});
+  const [dealValues, setDealValues] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [internal, setInternal] = useState(true);
@@ -61,6 +62,7 @@ export function CrmDetail({ kind, id }: { kind: CrmKind; id: string }) {
   const allowed = user && canWrite(user.role, crmConfig[kind].admin ? [] : ['SALES']);
   const owner = meta.data?.members.find((m) => m.id === row.ownerId);
   const contactFields = meta.data?.fields.filter((f) => f.entity === 'contacts') ?? [];
+  const dealFields = meta.data?.fields.filter((f) => f.entity === 'deals') ?? [];
   const stages =
     meta.data?.pipelines.flatMap((p) =>
       p.stages.filter((s) => s.outcome === 'OPEN').map((s) => ({ ...s, pipeline: p.name })),
@@ -78,6 +80,18 @@ export function CrmDetail({ kind, id }: { kind: CrmKind; id: string }) {
       const r = await api.post<{ contactId: string; dealId?: string }>(`/crm/leads/${id}/convert`, {
         createDeal,
         stageId: stageId || stages[0]?.id,
+        ...(createDeal
+          ? {
+              dealCustomFields: Object.fromEntries(
+                dealFields.map((f) => [
+                  f.key,
+                  f.type === 'NUMBER' && dealValues[f.key]
+                    ? Number(dealValues[f.key])
+                    : (dealValues[f.key] ?? ''),
+                ]),
+              ),
+            }
+          : {}),
         customFields: Object.fromEntries(
           contactFields.map((f) => [
             f.key,
@@ -638,6 +652,9 @@ export function CrmDetail({ kind, id }: { kind: CrmKind; id: string }) {
             </label>
           )}
           <CustomInputs fields={contactFields} values={customValues} setValues={setCustomValues} />
+          {createDeal && (
+            <CustomInputs fields={dealFields} values={dealValues} setValues={setDealValues} />
+          )}
           <div className="form-actions">
             <Button type="button" onClick={() => setConvert(false)}>
               Cancel
