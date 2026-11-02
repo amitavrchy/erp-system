@@ -27,3 +27,11 @@ export const modules:Record<string,{title:string;singular:string;endpoint:string
 };
 export const canWrite=(role:Role,roles:Role[])=>['OWNER','ADMIN',...roles].includes(role);
 export function documentHref(endpoint:string,id:string){const prefix=endpoint==='quotes'?'/app/sales/quotes':endpoint==='sales-orders'?'/app/sales/orders':endpoint==='invoices'?'/app/finance/invoices':'/app/purchasing/pos';return `${prefix}/${id}`;}
+
+export function canRead(role:Role,endpoint:string){
+ endpoint=['movements','adjustments'].includes(endpoint)?'stock':endpoint;
+ if(role==='SALES')return ['contacts','companies','products','warehouses','stock','quotes','sales-orders','invoices','tax-rates'].includes(endpoint.split('/')[0]);
+ if(role==='INVENTORY')return ['products','warehouses','stock','vendors','purchase-orders','sales-orders','tax-rates'].includes(endpoint.split('/')[0]);
+ return true;
+}
+export function visibleNavigation(role:Role){return navigation.filter(n=>role==='SALES'?!['Purchasing','Finance','Reports'].includes(n.label):role==='INVENTORY'?!['CRM','Finance','Reports'].includes(n.label):true).map(n=>role==='INVENTORY'&&n.label==='Sales'?{...n,href:'/app/sales/orders'}:n);}

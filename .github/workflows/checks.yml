@@ -1,0 +1,57 @@
+name: Ledgerflow checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: ledgerflow_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:test-password@localhost:5432/ledgerflow_test?schema=public
+      JWT_SECRET: ci-test-secret-not-for-production-0123456789
+      CLIENT_ORIGIN: http://localhost:3001
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      PLAYWRIGHT_BASE_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            Server/package-lock.json
+            Client/package-lock.json
+      - run: npm ci
+        working-directory: Server
+      - run: npm run db:migrate
+        working-directory: Server
+      - run: npm run lint && npm test && npm run test:integration && npm audit
+        working-directory: Server
+      - run: npm ci
+        working-directory: Client
+      - run: npm run lint && npm run build && npm audit
+        working-directory: Client
+      - run: npx playwright install --with-deps chromium
+        working-directory: Client
+      - run: |
+          (cd Server && node dist/main.js) > /tmp/ledgerflow-api.log 2>&1 &
+          (cd Client && npm start -- --port 3001) > /tmp/ledgerflow-client.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:4000/health && curl -fsS http://localhost:3001/login > /dev/null; then break; fi
+            sleep 1
+          done
+      - run: npx playwright test
+        working-directory: Client
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-artifacts
+          path: Client/test-results

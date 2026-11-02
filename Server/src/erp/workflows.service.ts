@@ -47,7 +47,7 @@ export class WorkflowsService {
       const common = { organizationId: a.orgId, number, ...sums, ...(kind !== 'purchase-orders' ? { createdById: a.userId } : {}) };
       const lines = dto.lines.map((l, i) => ({ productId: l.productId || null, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, taxBps: l.taxBps ?? 0, sortOrder: i }));
       const contactId = dto.contactId || null;
-      const doc = kind === 'quotes' ? await tx.quote.create({ data: { ...common, contactId, notes: dto.notes, validUntil: dto.validUntil ? new Date(dto.validUntil) : null, lines: { create: lines } } }) : kind === 'sales-orders' ? await tx.salesOrder.create({ data: { ...common, contactId, lines: { create: lines } } }) : kind === 'invoices' ? await tx.invoice.create({ data: { ...common, contactId, dueDate: dto.dueDate ? new Date(dto.dueDate) : null, lines: { create: lines } } }) : await tx.purchaseOrder.create({ data: { ...common, vendorId: dto.vendorId!, lines: { create: lines.map(({ taxBps: _tax, ...line }) => line) } } });
+      const doc = kind === 'quotes' ? await tx.quote.create({ data: { ...common, contactId, currency: (await tx.organization.findUniqueOrThrow({where:{id:a.orgId},select:{currency:true}})).currency, notes: dto.notes, validUntil: dto.validUntil ? new Date(dto.validUntil) : null, lines: { create: lines } } }) : kind === 'sales-orders' ? await tx.salesOrder.create({ data: { ...common, contactId, lines: { create: lines } } }) : kind === 'invoices' ? await tx.invoice.create({ data: { ...common, contactId, dueDate: dto.dueDate ? new Date(dto.dueDate) : null, lines: { create: lines } } }) : await tx.purchaseOrder.create({ data: { ...common, vendorId: dto.vendorId!, lines: { create: lines.map(({ taxBps: _tax, ...line }) => line) } } });
       await this.audit(tx, a, 'created', kind, doc.id);
       return doc;
     });
@@ -171,7 +171,7 @@ export class WorkflowsService {
     this.authorize(a, kind);
     return this.db.$transaction(async tx => {
       const model = tx[models[kind]] as unknown as { findFirst(args: object): Promise<{ status: string } | null>; update(args: object): Promise<unknown> };
-      const doc = await model.findFirst({ where: { id, organizationId: a.orgId } });
+      const doc = await model.findFirst({ where: { id, organizationId: a.orgId, ...(a.role === 'SALES' ? { createdById: a.userId } : {}) } });
       if (!doc) throw new NotFoundException();
       if (doc.status !== 'DRAFT') throw new BadRequestException('Only draft documents can be voided');
       const updated = await model.update({ where: { id }, data: { status: 'VOID' } });

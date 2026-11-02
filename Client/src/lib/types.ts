@@ -11,6 +11,7 @@ export interface Entity {
   createdAt?: string; paidAt?: string; dueDate?: string; issueDate?: string;
   contactId?: string; companyId?: string; vendorId?: string; vendorName?: string;
   contact?: Entity; company?: Entity; vendor?: Entity; product?: Entity; warehouse?: Entity;
+  attrsJson?: Record<string,string>; metaJson?: {note?:string};
   stockLevels?: { quantity: number; warehouse: Entity }[];
   lines?: Line[]; quote?: Entity; salesOrder?: Entity; invoices?: Entity[];
   allocations?: { amount: string; invoice?: Entity; payment?: Entity }[];

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ValidateIf, IsString, Length, IsInt, Min, Max, IsNumber, IsEmail, IsBoolean, IsArray, IsIn, ValidateNested, IsDateString, MaxLength } from 'class-validator';
+import { ValidateIf, IsString, Length, IsInt, Min, Max, IsNumber, IsEmail, IsBoolean, IsArray, IsIn, ValidateNested, IsDateString, MaxLength, Matches, IsObject } from 'class-validator';
 
 export class ListDto {
   @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(200) q?: string;
@@ -11,6 +11,7 @@ export class ListDto {
   @ValidateIf((_object, value) => value !== undefined) @IsDateString() to?: string;
 }
 export class MasterDto {
+  @ValidateIf((_object, value) => value !== undefined) @IsObject() attrsJson?: Record<string,string>;
   @ValidateIf((_object, value) => value !== undefined) @IsString() @Length(2, 120) name?: string;
   @ValidateIf((_object, value) => value !== undefined) @IsEmail() email?: string;
   @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(40) phone?: string;
@@ -73,4 +74,13 @@ export class OrgDto {
 export class MemberDto {
   @IsEmail() email: string;
   @IsIn(['ADMIN','SALES','INVENTORY','FINANCE','VIEWER']) role: 'ADMIN' | 'SALES' | 'INVENTORY' | 'FINANCE' | 'VIEWER';
+}
+export class RoleDto {
+  @IsIn(['ADMIN','SALES','INVENTORY','FINANCE','VIEWER']) role: 'ADMIN'|'SALES'|'INVENTORY'|'FINANCE'|'VIEWER';
+}
+export class NoteDto { @IsString() @Length(1,5000) text: string; }
+export class SequenceDto { @IsString() @Matches(/^[A-Z][A-Z0-9-]{0,11}$/) prefix: string; }
+export class TemplateDto {
+  @IsString() @Length(1,200) subject: string;
+  @IsString() @Length(1,5000) body: string;
 }

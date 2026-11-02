@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Download, ChevronLeft, ChevronRight, Pencil, List, Columns3 } from 'lucide-react';
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy';
 import { toast } from 'sonner';
-import { modules, canWrite, documentHref } from '@/lib/modules';
+import { modules, canWrite, canRead, documentHref } from '@/lib/modules';
 import { api, money, date, errorMessage } from '@/lib/api';
 import { exportRecords } from '@/lib/export';
 import type { Entity } from '@/lib/types';
@@ -16,7 +16,7 @@ import { Button, Badge, Empty, Skeleton, ErrorState, Modal } from './ui';
 import { CreateDialog } from './record-form';
 import { StockAdjustment } from './stock-adjustment';
 
-export function ModuleTabs({moduleKey}:{moduleKey:string}){const c=modules[moduleKey];return <nav className="module-tabs" aria-label="Module navigation">{c.tabs.map(([label,href])=><Link className={href.endsWith('/'+moduleKey)?'active':''} key={href} href={href}>{label}</Link>)}</nav>;}
+export function ModuleTabs({moduleKey}:{moduleKey:string}){const c=modules[moduleKey];const {user}=useWorkspace();return <nav className="module-tabs" aria-label="Module navigation">{c.tabs.filter(([,href])=>canRead(user?.role??'VIEWER',href.endsWith('/orders')?'sales-orders':href.endsWith('/pos')?'purchase-orders':href.split('/').at(-1)??'')).map(([label,href])=><Link className={href.endsWith('/'+moduleKey)?'active':''} key={href} href={href}>{label}</Link>)}</nav>;}
 export function ListPage({moduleKey}:{moduleKey:string}){
   const c=modules[moduleKey];const searchParams=useSearchParams();const {user,org,orgId}=useWorkspace();const cache=useQueryClient();
   const [q,setQ]=useState('');const [debounced,setDebounced]=useState('');const [page,setPage]=useState(1);const [status,setStatus]=useState('');const [low,setLow]=useState(searchParams.get('low')==='true');const [open,setOpen]=useState(searchParams.has('new'));const [edit,setEdit]=useState<Entity>();const [exporting,setExporting]=useState(false);const [kanban,setKanban]=useState(false);const [pay,setPay]=useState<Entity>();const [paying,setPaying]=useState(false);

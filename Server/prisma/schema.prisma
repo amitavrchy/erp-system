@@ -50,31 +50,33 @@ enum ActivityType {
 }
 
 model Organization {
-  bills          Bill[]
-  invitations    Invitation[]
-  id             String           @id @default(cuid())
-  name           String
-  slug           String           @unique
-  currency       String           @default("USD")
-  timezone       String           @default("UTC")
-  logoUrl        String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  members        Membership[]
-  contacts       Contact[]
-  companies      Company[]
-  products       Product[]
-  warehouses     Warehouse[]
-  quotes         Quote[]
-  salesOrders    SalesOrder[]
-  invoices       Invoice[]
-  payments       Payment[]
-  vendors        Vendor[]
-  purchaseOrders PurchaseOrder[]
-  stockMoves     StockMovement[]
-  taxRates       TaxRate[]
-  auditLogs      AuditLog[]
-  sequences      NumberSequence[]
+  invoiceEmailSubject String           @default("Invoice {{number}} from {{organization}}")
+  invoiceEmailBody    String           @default("Thank you for your business. Please find your invoice details attached.")
+  bills               Bill[]
+  invitations         Invitation[]
+  id                  String           @id @default(cuid())
+  name                String
+  slug                String           @unique
+  currency            String           @default("USD")
+  timezone            String           @default("UTC")
+  logoUrl             String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  members             Membership[]
+  contacts            Contact[]
+  companies           Company[]
+  products            Product[]
+  warehouses          Warehouse[]
+  quotes              Quote[]
+  salesOrders         SalesOrder[]
+  invoices            Invoice[]
+  payments            Payment[]
+  vendors             Vendor[]
+  purchaseOrders      PurchaseOrder[]
+  stockMoves          StockMovement[]
+  taxRates            TaxRate[]
+  auditLogs           AuditLog[]
+  sequences           NumberSequence[]
 }
 
 model User {

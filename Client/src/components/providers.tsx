@@ -15,7 +15,7 @@ function Bootstrap({children}: {children: React.ReactNode}) {
     try {
       const saved = JSON.parse(localStorage.getItem('ledgerflow-ui') ?? 'null');
       dispatch(preferences(saved ? { theme: saved.theme === 'light' ? 'light' : 'dark', density: saved.density === 'compact' ? 'compact' : 'comfortable', collapsed: saved.collapsed === true } : { theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light' }));
-    } catch { /* A blocked localStorage still leaves a usable default. */ }
+    } catch { dispatch(preferences({ theme: 'dark' })); }
     let live = true;
     refreshSession().then(() => api.get<Me>('/me')).then(r => { if (live) { dispatch(session(r.data)); dispatch(activeOrg(r.data.activeOrgId)); } }).catch(() => { if (live) dispatch(session(null)); });
     const expire = () => dispatch(session(null));

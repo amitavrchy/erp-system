@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Post, Patch, Delete, Param, Query, Req, UseGuards, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Patch, Delete, Param, Query, Req, UseGuards, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, Roles, type AuthRequest } from '../auth/auth.guard.js';
 import { CatalogService } from './catalog.service.js';
 import { WorkflowsService, docKinds, type DocKind } from './workflows.service.js';
 import { ReportsService } from './reports.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ListDto, MasterDto, DocumentDto, AdjustmentDto, PaymentDto, ReceiveDto, WarehouseDto, OrgDto, MemberDto } from '../common/dto.js';
+import { ListDto, MasterDto, DocumentDto, AdjustmentDto, PaymentDto, ReceiveDto, WarehouseDto, OrgDto, MemberDto, RoleDto, NoteDto, SequenceDto, TemplateDto } from '../common/dto.js';
 import { randomBytes, createHash } from 'node:crypto';
 
 const masters = ['contacts','companies','products','warehouses','vendors','tax-rates'];
@@ -30,9 +30,54 @@ export class ErpController {
   }
   @Post('orgs/current/members') @Roles() async invite(@Req() r: AuthRequest, @Body() dto: MemberDto) {
     const token = randomBytes(32).toString('hex');
-    const invitation = await this.db.invitation.create({ data: { organizationId: r.actor.orgId, email: dto.email.toLowerCase(), role: dto.role, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: new Date(Date.now() + 7 * 86400000) } });
-    await this.flows.audit(this.db, r.actor, 'member invited', 'members', invitation.id);
+    const invitation = await this.db.$transaction(async tx=>{
+      const result = await tx.invitation.create({ data: { organizationId: r.actor.orgId, email: dto.email.toLowerCase(), role: dto.role, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: new Date(Date.now() + 7 * 86400000) } });
+      await this.flows.audit(tx, r.actor, 'member invited', 'members', result.id);return result;
+    });
     return { url: `${process.env.CLIENT_ORIGIN ?? 'http://localhost:3000'}/invite/${token}`, expiresAt: invitation.expiresAt };
+  }
+  @Patch('orgs/current/members/:id') @Roles() async changeRole(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:RoleDto) {
+    return this.db.$transaction(async tx=>{
+      const member=await tx.membership.findFirst({where:{id,organizationId:r.actor.orgId}});if(!member)throw new NotFoundException();
+      if(member.role==='OWNER'||member.userId===r.actor.userId)throw new ForbiddenException('Owner and your own membership cannot be changed here');
+      const result=await tx.membership.update({where:{id},data:{role:dto.role}});await this.flows.audit(tx,r.actor,'member role updated','members',id);return result;
+    });
+  }
+  @Delete('orgs/current/members/:id') @Roles() async removeMember(@Req() r:AuthRequest,@Param('id') id:string) {
+    return this.db.$transaction(async tx=>{
+      const member=await tx.membership.findFirst({where:{id,organizationId:r.actor.orgId}});if(!member)throw new NotFoundException();
+      if(member.role==='OWNER'||member.userId===r.actor.userId)throw new ForbiddenException('Owner and your own membership cannot be removed here');
+      await tx.membership.delete({where:{id}});await tx.refreshSession.deleteMany({where:{userId:member.userId,organizationId:r.actor.orgId}});
+      await this.flows.audit(tx,r.actor,'member removed','members',id);return {ok:true};
+    });
+  }
+  @Get('orgs/current/sequences') @Roles() async sequences(@Req() r:AuthRequest) {
+    const saved=await this.db.numberSequence.findMany({where:{organizationId:r.actor.orgId}});
+    return docKinds.map((key,i)=>saved.find(s=>s.key===key)??{key,prefix:['QT','SO','INV','PO'][i],nextValue:1});
+  }
+  @Patch('orgs/current/sequences/:key') @Roles() async sequence(@Req() r:AuthRequest,@Param('key') key:string,@Body() dto:SequenceDto) {
+    this.kind(key);
+    return this.db.$transaction(async tx=>{
+      const result=await tx.numberSequence.upsert({where:{organizationId_key:{organizationId:r.actor.orgId,key}},create:{organizationId:r.actor.orgId,key,prefix:dto.prefix},update:{prefix:dto.prefix}});
+      await this.flows.audit(tx,r.actor,'number prefix updated','sequences',result.id);return result;
+    });
+  }
+  @Get('orgs/current/templates') @Roles() async template(@Req() r:AuthRequest) {
+    const o=await this.db.organization.findUniqueOrThrow({where:{id:r.actor.orgId}});return {subject:o.invoiceEmailSubject,body:o.invoiceEmailBody};
+  }
+  @Patch('orgs/current/templates') @Roles() async saveTemplate(@Req() r:AuthRequest,@Body() dto:TemplateDto) {
+    return this.db.$transaction(async tx=>{await tx.organization.update({where:{id:r.actor.orgId},data:{invoiceEmailSubject:dto.subject,invoiceEmailBody:dto.body}});await this.flows.audit(tx,r.actor,'document template updated','organization',r.actor.orgId);return dto;});
+  }
+  @Get('contacts/:id/activity') async contactActivity(@Req() r:AuthRequest,@Param('id') id:string) {
+    await this.catalog.get(r.actor,'contacts',id);
+    return this.db.auditLog.findMany({where:{organizationId:r.actor.orgId,entityType:'contacts',entityId:id},orderBy:{createdAt:'desc'},take:50,include:{user:{select:{name:true}}}});
+  }
+  @Post('contacts/:id/notes') @Roles('SALES') async addNote(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:NoteDto) {
+    if(!dto.text.trim())throw new BadRequestException('Write a note first');
+    return this.db.$transaction(async tx=>{
+      if(!await tx.contact.findFirst({where:{id,organizationId:r.actor.orgId}}))throw new NotFoundException();
+      return tx.auditLog.create({data:{organizationId:r.actor.orgId,userId:r.actor.userId,action:'added a note',entityType:'contacts',entityId:id,metaJson:{note:dto.text.trim()}}});
+    });
   }
   @Get('reports/dashboard') dashboard(@Req() r: AuthRequest) { return this.reports.dashboard(r.actor); }
   @Get('reports/accounts') async accounts(@Req() r: AuthRequest) {
@@ -50,6 +95,7 @@ export class ErpController {
   }
   @Get('reports/ar-aging') aging(@Req() r: AuthRequest) { return this.reports.aging(r.actor); }
   @Get('reports/sales') sales(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.sales(r.actor,q); }
+  @Get('reports/profit-loss') profitLoss(@Req() r: AuthRequest,@Query() q:ListDto){return this.reports.profitLoss(r.actor,q);}
   @Get('stock') stock(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.stock(r.actor,q); }
   @Post('stock/adjustments') @Roles('INVENTORY') adjust(@Req() r: AuthRequest, @Body() dto: AdjustmentDto) { return this.flows.adjust(r.actor,dto); }
   @Get('stock/movements') async moves(@Req() r: AuthRequest, @Query() q: ListDto) {
