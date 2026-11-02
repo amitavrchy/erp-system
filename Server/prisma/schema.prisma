@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,3 +7,398 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum MembershipRole {
+  OWNER
+  ADMIN
+  SALES
+  INVENTORY
+  FINANCE
+  VIEWER
+}
+
+enum DocStatus {
+  DRAFT
+  OPEN
+  SENT
+  PARTIAL
+  PAID
+  VOID
+  CANCELLED
+}
+
+enum MovementType {
+  ADJUST
+  RECEIVE
+  SHIP
+  TRANSFER
+  RETURN
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK
+  OTHER
+}
+
+enum ActivityType {
+  NOTE
+  EMAIL
+  CALL
+  MEETING
+  SYSTEM
+}
+
+model Organization {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique
+  currency       String           @default("USD")
+  timezone       String           @default("UTC")
+  logoUrl        String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  members        Membership[]
+  contacts       Contact[]
+  companies      Company[]
+  products       Product[]
+  warehouses     Warehouse[]
+  quotes         Quote[]
+  salesOrders    SalesOrder[]
+  invoices       Invoice[]
+  payments       Payment[]
+  vendors        Vendor[]
+  purchaseOrders PurchaseOrder[]
+  stockMoves     StockMovement[]
+  taxRates       TaxRate[]
+  auditLogs      AuditLog[]
+  sequences      NumberSequence[]
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  sessions     RefreshSession[]
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole @default(VIEWER)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+model NumberSequence {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String // quote, so, invoice, po
+  prefix         String
+  nextValue      Int          @default(1)
+
+  @@unique([organizationId, key])
+}
+
+model TaxRate {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  rateBps        Int // 1000 = 10.00%
+  isDefault      Boolean      @default(false)
+}
+
+model Company {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  website        String?
+  notes          String?
+  contacts       Contact[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, name])
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String?
+  company        Company?     @relation(fields: [companyId], references: [id])
+  name           String
+  email          String?
+  phone          String?
+  title          String?
+  tags           String[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  quotes         Quote[]
+  salesOrders    SalesOrder[]
+  invoices       Invoice[]
+
+  @@index([organizationId, name])
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sku            String
+  name           String
+  description    String?
+  unitPrice      Decimal      @db.Decimal(14, 2)
+  costPrice      Decimal      @default(0) @db.Decimal(14, 2)
+  reorderPoint   Int          @default(0)
+  isActive       Boolean      @default(true)
+  attrsJson      Json?
+  stockLevels    StockLevel[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, sku])
+}
+
+model Warehouse {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  code           String
+  isDefault      Boolean      @default(false)
+  stockLevels    StockLevel[]
+
+  @@unique([organizationId, code])
+}
+
+model StockLevel {
+  id          String    @id @default(cuid())
+  productId   String
+  warehouseId String
+  quantity    Int       @default(0)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productId      String
+  warehouseId    String
+  type           MovementType
+  quantity       Int // signed: +in / -out
+  reason         String?
+  referenceType  String?
+  referenceId    String?
+  createdAt      DateTime     @default(now())
+  createdById    String?
+
+  @@index([organizationId, createdAt])
+}
+
+model Quote {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  contactId      String?
+  contact        Contact?     @relation(fields: [contactId], references: [id])
+  status         DocStatus    @default(DRAFT)
+  currency       String       @default("USD")
+  subtotal       Decimal      @db.Decimal(14, 2)
+  taxTotal       Decimal      @db.Decimal(14, 2)
+  total          Decimal      @db.Decimal(14, 2)
+  notes          String?
+  validUntil     DateTime?
+  lines          QuoteLine[]
+  salesOrder     SalesOrder?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, number])
+}
+
+model QuoteLine {
+  id          String  @id @default(cuid())
+  quoteId     String
+  quote       Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  productId   String?
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(14, 2)
+  taxBps      Int     @default(0)
+  sortOrder   Int     @default(0)
+}
+
+model SalesOrder {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  quoteId        String?          @unique
+  quote          Quote?           @relation(fields: [quoteId], references: [id])
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id])
+  status         DocStatus        @default(OPEN)
+  subtotal       Decimal          @db.Decimal(14, 2)
+  taxTotal       Decimal          @db.Decimal(14, 2)
+  total          Decimal          @db.Decimal(14, 2)
+  lines          SalesOrderLine[]
+  invoices       Invoice[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([organizationId, number])
+}
+
+model SalesOrderLine {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId    String?
+  description  String
+  quantity     Int
+  unitPrice    Decimal    @db.Decimal(14, 2)
+  taxBps       Int        @default(0)
+  sortOrder    Int        @default(0)
+}
+
+model Invoice {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  salesOrderId   String?
+  salesOrder     SalesOrder?         @relation(fields: [salesOrderId], references: [id])
+  contactId      String?
+  contact        Contact?            @relation(fields: [contactId], references: [id])
+  status         DocStatus           @default(DRAFT)
+  issueDate      DateTime            @default(now())
+  dueDate        DateTime?
+  subtotal       Decimal             @db.Decimal(14, 2)
+  taxTotal       Decimal             @db.Decimal(14, 2)
+  total          Decimal             @db.Decimal(14, 2)
+  amountPaid     Decimal             @default(0) @db.Decimal(14, 2)
+  lines          InvoiceLine[]
+  allocations    PaymentAllocation[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, dueDate])
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(14, 2)
+  taxBps      Int     @default(0)
+  sortOrder   Int     @default(0)
+}
+
+model Payment {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Decimal             @db.Decimal(14, 2)
+  method         PaymentMethod       @default(BANK)
+  paidAt         DateTime            @default(now())
+  reference      String?
+  allocations    PaymentAllocation[]
+  createdAt      DateTime            @default(now())
+}
+
+model PaymentAllocation {
+  id        String  @id @default(cuid())
+  paymentId String
+  invoiceId String
+  amount    Decimal @db.Decimal(14, 2)
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  email          String?
+  phone          String?
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+}
+
+model PurchaseOrder {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number         String
+  vendorId       String
+  vendor         Vendor              @relation(fields: [vendorId], references: [id])
+  status         DocStatus           @default(DRAFT)
+  subtotal       Decimal             @db.Decimal(14, 2)
+  taxTotal       Decimal             @db.Decimal(14, 2)
+  total          Decimal             @db.Decimal(14, 2)
+  lines          PurchaseOrderLine[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, number])
+}
+
+model PurchaseOrderLine {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId        String?
+  description      String
+  quantity         Int
+  quantityReceived Int           @default(0)
+  unitPrice        Decimal       @db.Decimal(14, 2)
+  sortOrder        Int           @default(0)
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+  action         String
+  entityType     String
+  entityId       String?
+  metaJson       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+model RefreshSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
