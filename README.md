@@ -1,123 +1,86 @@
-# ERP System
+# Ledgerflow
 
-TypeScript workspace for an ERP: a Next.js client and a NestJS API on PostgreSQL.
+A connected ERP workspace for small and growing teams. Built with Next.js 16, React 19, NestJS 12, Prisma 6 and PostgreSQL 16. The build follows [the project specification](docs/PROJECT_SPEC.md); all interface text is at least **14px**, including compact tables.
 
-## Overview
+## What works
 
-The repository is two applications that share no root workspace file. `Client` is the web app. `Server` is the HTTP API and owns the database tooling.
+- Organization registration, sign-in, rotating HTTP-only refresh sessions, workspace switching, invitations and roles.
+- CRM companies and contacts, tags, connected documents, notes and activity.
+- Products with text attributes, warehouses, stock adjustments, low stock and a movement ledger.
+- Quotes → sales orders → invoices → partial/full payments, plus order shipping.
+- Purchase orders → partial/full receiving → stock movements → vendor bills and recorded bill payment.
+- Dashboard with real KPIs, attention items and activity; sales by period, AR aging, stock valuation, simplified accounts and estimated gross margin.
+- Draft editing, automatic document numbering, print views, CSV export, command search, dark/light theme and density preferences.
+- Role checks and tenant isolation in the API, audit records for business mutations, exact decimal document totals and serializable money/stock transactions.
 
-The client is a Next.js App Router project. `src/app/layout.tsx` loads Geist and Geist Mono, and `src/app/page.tsx` is the home route. Global styles come from Tailwind CSS in `src/app/globals.css`. `next.config.ts` turns on cache components and partial prefetching.
+## Run locally
 
-The API is a NestJS application that runs as ES modules. `AppModule` imports a global `ConfigModule` and a global `PrismaModule`. `PrismaService` extends `PrismaClient`, connects in `onModuleInit`, and disconnects in `onModuleDestroy`. `GET /` is handled by `AppController`, which returns the string from `AppService`. The Prisma schema targets PostgreSQL through `DATABASE_URL` and does not declare models yet.
+Requirements: Node.js 24, npm and Docker Desktop. Run these commands from the repository root:
 
-PostgreSQL 16 is defined in `Server/docker-compose.yml`. `Server/Dockerfile` builds the API on Node 22, generates the Prisma client, and starts `dist/main`.
-
-## Key features
-
-- Next.js App Router client with TypeScript, Tailwind CSS, and the Geist font family
-- NestJS API with a root `GET` handler, covered by a Vitest unit test and an end-to-end test
-- Global configuration through `@nestjs/config`
-- Prisma client connected for the life of the Nest process
-- PostgreSQL 16 Compose service named `erp-system-db`, using database `erp_system`
-- API image that installs dependencies, runs `prisma generate`, and serves the compiled build
-- ESLint on the client and oxlint on the server
-
-## Tech stack
-
-![Next.js](https://img.shields.io/badge/Next.js-16-black)
-![React](https://img.shields.io/badge/React-19-149ECA)
-![TypeScript](https://img.shields.io/badge/TypeScript-5%2F6-3178C6)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8)
-![NestJS](https://img.shields.io/badge/NestJS-12-E0234E)
-![Prisma](https://img.shields.io/badge/Prisma-6-2D3748)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1)
-![Docker](https://img.shields.io/badge/Docker-Node%2022-2496ED)
-
-| App | In use | Also declared in `package.json` |
-| --- | --- | --- |
-| Client | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 | Redux Toolkit, TanStack Query, TanStack Table, axios, React Hook Form, Zod, Radix UI, Recharts, Framer Motion, date-fns, react-day-picker, Sonner, clsx, tailwind-merge |
-| Server | NestJS 12, Prisma 6, PostgreSQL 16, TypeScript 6, Vitest | JWT, Passport, bcrypt, class-validator, class-transformer, Swagger |
-
-## Project structure
-
-```text
-.
-├── Client
-│   ├── public                 static assets
-│   ├── src/app                App Router layout, home page, global styles
-│   ├── eslint.config.mjs
-│   ├── next.config.ts
-│   ├── package.json
-│   └── tsconfig.json
-└── Server
-    ├── prisma                 Prisma schema (PostgreSQL, DATABASE_URL)
-    ├── src                    Nest module, root controller, Prisma module
-    ├── test                   end-to-end test for GET /
-    ├── docker-compose.yml     PostgreSQL 16
-    ├── Dockerfile             API image
-    ├── nest-cli.json
-    ├── package.json
-    ├── prisma.config.ts
-    └── tsconfig.json
-```
-
-## Getting started
-
-### Prerequisites
-
-- Node.js 22 (the version in `Server/Dockerfile`)
-- npm
-- Docker, for the Postgres service under `Server`
-
-### Environment
-
-Create a gitignored `.env` file in `Server`. `@nestjs/config` and the Prisma config both read it.
-
-| Variable | Role |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string. Required by `prisma/schema.prisma` and `prisma.config.ts`. Match `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in `Server/docker-compose.yml`. Compose publishes port `5432`. |
-| `PORT` | Optional. `Server/src/main.ts` listens on `PORT` and falls back to `3000` when it is unset. The client `dev` and `start` scripts also honor `PORT`. |
-
-The API and the client both fall back to port `3000`. Set `PORT` on one of them when you run both at the same time.
-
-Export `DATABASE_URL` before `npm install` in `Server`. The postinstall script loads `prisma.config.ts`, which requires that variable.
-
-### Client
-
-```bash
-cd Client
-npm install
-npm run dev
-```
-
-```bash
-npm run build
-npm run start
-npm run lint
-```
-
-`npm run build` typechecks the app and writes the production output. `npm run lint` runs ESLint.
-
-### Server
-
-```bash
+```powershell
+node scripts/setup-local.mjs
 cd Server
-npm install
-npx prisma generate
+npm ci
 docker compose up -d
+npm run db:migrate
+npm run seed
 npm run start:dev
 ```
 
-```bash
-npm run build
-npm run start:prod
-npm run lint
-npm test
-npm run test:e2e
+Open a second terminal:
+
+```powershell
+cd Client
+npm ci
+npm run dev
 ```
 
-`npm run build` compiles with the Nest CLI. `npm run lint` runs oxlint on `src` and `test`. `npm test` runs unit tests. `npm run test:e2e` boots `AppModule`, which connects Prisma, so `DATABASE_URL` must point at a database the process can reach.
+Open **http://localhost:3000**. The API runs at **http://localhost:4000**, Swagger at **http://localhost:4000/api/docs**, and the database readiness probe at **http://localhost:4000/health**.
 
-## Author
+Postgres binds to `127.0.0.1:55434`, separate from other local projects. Demo sign-in is `owner@ledgerflow.demo`; use `DEMO_PASSWORD` from your local `Server/.env`. The seed runs atomically, refuses production, and preserves an existing demo workspace. You can also register a fresh workspace without seeding.
 
-[Amitav Roy Chowdhury](https://github.com/amitavrchy)
+If port 3000 is occupied, use `node scripts/setup-local.mjs --client-port=3001` on first setup, then `npm run dev -- --port 3001`. For existing env files, update `Server/.env` to `CLIENT_ORIGIN=http://localhost:3001` and restart the API. The setup helper never overwrites existing env files.
+
+## Verification
+
+With Postgres running and `Server/.env` configured:
+
+```powershell
+cd Server
+npm run lint
+npm test
+npm run test:integration
+npm audit
+```
+
+The integration suite starts an isolated API port (4101), creates its own tenants, tests validation, cross-tenant access, document conversion, partial payments and receipts, stock, roles, session rotation, settings and concurrent payments, then removes its fixtures. `npm run test:e2e` is an alias for that suite.
+
+With the API and client running at the origins above:
+
+```powershell
+cd Client
+npm run lint
+npm run build
+npx playwright install chromium
+npm run test:e2e
+npm audit
+```
+
+Browser tests default to `http://localhost:3001`; set `PLAYWRIGHT_BASE_URL` if you use another port. They create temporary Browser QA workspaces, exercise the actual UI, and clean up their fixtures. Screenshots and failure traces go to ignored `Client/test-results/`. CI runs both builds and browser tests against Postgres.
+
+## Structure
+
+- `Client/src/app`: marketing, auth and workspace routes.
+- `Client/src/components`: shell, tables, forms, document screens and reports.
+- `Client/src/store`: auth, organization and UI state. Access tokens stay in memory.
+- `Client/src/hooks`: organization-scoped React Query hooks.
+- `Server/src/auth`: authentication, membership lookup and role guard.
+- `Server/src/erp`: catalog, transactional workflows, reports and REST controllers.
+- `Server/prisma`: schema, committed migrations and demo seed.
+- `docs`: specification, acceptance results and deployment guidance.
+
+## Scope
+
+This is the specification's connected MVP, with simplified accounts and vendor bills. Email delivery, server-generated PDFs, Stripe, manufacturing, FX and full double-entry accounting are stretch integrations and are not enabled. Issuing an invoice changes its accounting status; it does not send an email. Printing uses the browser print dialog. Vendor bill payment records an external payment; it does not move money.
+
+See [deployment guidance](docs/DEPLOYMENT.md) before operating a production instance and [verification notes](docs/VERIFICATION.md) for the tested release.
