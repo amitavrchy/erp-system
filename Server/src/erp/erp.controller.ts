@@ -1,153 +1,613 @@
-import { Body, Controller, Get, Post, Patch, Delete, Param, Query, Req, UseGuards, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, Roles, type AuthRequest } from '../auth/auth.guard.js';
 import { CatalogService } from './catalog.service.js';
-import { WorkflowsService, docKinds, type DocKind } from './workflows.service.js';
+import {
+  WorkflowsService,
+  docKinds,
+  type DocKind,
+} from './workflows.service.js';
 import { ReportsService } from './reports.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ListDto, MasterDto, DocumentDto, AdjustmentDto, PaymentDto, ReceiveDto, WarehouseDto, OrgDto, MemberDto, RoleDto, NoteDto, SequenceDto, TemplateDto } from '../common/dto.js';
+import {
+  ListDto,
+  MasterDto,
+  DocumentDto,
+  AdjustmentDto,
+  PaymentDto,
+  ReceiveDto,
+  WarehouseDto,
+  OrgDto,
+  MemberDto,
+  RoleDto,
+  NoteDto,
+  SequenceDto,
+  TemplateDto,
+} from '../common/dto.js';
 import { randomBytes, createHash } from 'node:crypto';
 
-const masters = ['contacts','companies','products','warehouses','vendors','tax-rates'];
-@ApiTags('Workspace') @ApiBearerAuth() @UseGuards(AuthGuard) @Controller()
+const masters = [
+  'contacts',
+  'companies',
+  'products',
+  'warehouses',
+  'vendors',
+  'tax-rates',
+];
+@ApiTags('Workspace')
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
+@Controller()
 export class ErpController {
-  constructor(private catalog: CatalogService, private flows: WorkflowsService, private reports: ReportsService, private db: PrismaService) {}
-  private kind(kind: string): DocKind { if (!(docKinds as readonly string[]).includes(kind)) throw new NotFoundException(); return kind as DocKind; }
+  constructor(
+    private catalog: CatalogService,
+    private flows: WorkflowsService,
+    private reports: ReportsService,
+    private db: PrismaService,
+  ) {}
+  private kind(kind: string): DocKind {
+    if (!(docKinds as readonly string[]).includes(kind))
+      throw new NotFoundException();
+    return kind as DocKind;
+  }
 
-  @Get('orgs/current') org(@Req() r: AuthRequest) { return this.db.organization.findUniqueOrThrow({ where: { id: r.actor.orgId } }); }
-  @Patch('orgs/current') @Roles() async updateOrg(@Req() r: AuthRequest, @Body() dto: OrgDto) {
-    if (!/^[A-Z]{3}$/.test(dto.currency)) throw new BadRequestException('Use an uppercase ISO currency code');
-    try { new Intl.DateTimeFormat('en', { timeZone: dto.timezone }); new Intl.NumberFormat('en', { style: 'currency', currency: dto.currency }); } catch { throw new BadRequestException('Invalid currency or timezone'); }
-    const org = await this.db.organization.findUniqueOrThrow({ where: { id: r.actor.orgId } });
-    if (org.currency !== dto.currency && (await this.db.invoice.count({ where: { organizationId: r.actor.orgId } }) || await this.db.quote.count({ where: { organizationId: r.actor.orgId } }) || await this.db.purchaseOrder.count({ where: { organizationId: r.actor.orgId } }) || await this.db.salesOrder.count({ where: { organizationId: r.actor.orgId } }))) throw new BadRequestException('Currency cannot change after documents have been created');
-    return this.db.$transaction(async tx => {
-      const result = await tx.organization.update({ where: { id: r.actor.orgId }, data: dto });
-      await this.flows.audit(tx, r.actor, 'profile updated', 'organization', r.actor.orgId); return result;
+  @Get('orgs/current') org(@Req() r: AuthRequest) {
+    return this.db.organization.findUniqueOrThrow({
+      where: { id: r.actor.orgId },
+    });
+  }
+  @Patch('orgs/current') @Roles() async updateOrg(
+    @Req() r: AuthRequest,
+    @Body() dto: OrgDto,
+  ) {
+    if (!/^[A-Z]{3}$/.test(dto.currency))
+      throw new BadRequestException('Use an uppercase ISO currency code');
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: dto.timezone });
+      new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency: dto.currency,
+      });
+    } catch {
+      throw new BadRequestException('Invalid currency or timezone');
+    }
+    const org = await this.db.organization.findUniqueOrThrow({
+      where: { id: r.actor.orgId },
+    });
+    if (
+      org.currency !== dto.currency &&
+      ((await this.db.invoice.count({
+        where: { organizationId: r.actor.orgId },
+      })) ||
+        (await this.db.quote.count({
+          where: { organizationId: r.actor.orgId },
+        })) ||
+        (await this.db.purchaseOrder.count({
+          where: { organizationId: r.actor.orgId },
+        })) ||
+        (await this.db.salesOrder.count({
+          where: { organizationId: r.actor.orgId },
+        })))
+    )
+      throw new BadRequestException(
+        'Currency cannot change after documents have been created',
+      );
+    return this.db.$transaction(async (tx) => {
+      const result = await tx.organization.update({
+        where: { id: r.actor.orgId },
+        data: dto,
+      });
+      await this.flows.audit(
+        tx,
+        r.actor,
+        'profile updated',
+        'organization',
+        r.actor.orgId,
+      );
+      return result;
     });
   }
   @Get('orgs/current/members') @Roles() async members(@Req() r: AuthRequest) {
-    return this.db.membership.findMany({ where: { organizationId: r.actor.orgId }, include: { user: { select: { id: true, name: true, email: true } } } });
+    return this.db.membership.findMany({
+      where: { organizationId: r.actor.orgId },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
   }
-  @Post('orgs/current/members') @Roles() async invite(@Req() r: AuthRequest, @Body() dto: MemberDto) {
+  @Post('orgs/current/members') @Roles() async invite(
+    @Req() r: AuthRequest,
+    @Body() dto: MemberDto,
+  ) {
     const token = randomBytes(32).toString('hex');
-    const invitation = await this.db.$transaction(async tx=>{
-      const result = await tx.invitation.create({ data: { organizationId: r.actor.orgId, email: dto.email.toLowerCase(), role: dto.role, tokenHash: createHash('sha256').update(token).digest('hex'), expiresAt: new Date(Date.now() + 7 * 86400000) } });
-      await this.flows.audit(tx, r.actor, 'member invited', 'members', result.id);return result;
+    const invitation = await this.db.$transaction(async (tx) => {
+      const result = await tx.invitation.create({
+        data: {
+          organizationId: r.actor.orgId,
+          email: dto.email.toLowerCase(),
+          role: dto.role,
+          tokenHash: createHash('sha256').update(token).digest('hex'),
+          expiresAt: new Date(Date.now() + 7 * 86400000),
+        },
+      });
+      await this.flows.audit(
+        tx,
+        r.actor,
+        'member invited',
+        'members',
+        result.id,
+      );
+      return result;
     });
-    return { url: `${process.env.CLIENT_ORIGIN ?? 'http://localhost:3000'}/invite/${token}`, expiresAt: invitation.expiresAt };
+    return {
+      url: `${process.env.CLIENT_ORIGIN ?? 'http://localhost:3000'}/invite/${token}`,
+      expiresAt: invitation.expiresAt,
+    };
   }
-  @Patch('orgs/current/members/:id') @Roles() async changeRole(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:RoleDto) {
-    return this.db.$transaction(async tx=>{
-      const member=await tx.membership.findFirst({where:{id,organizationId:r.actor.orgId}});if(!member)throw new NotFoundException();
-      if(member.role==='OWNER'||member.userId===r.actor.userId)throw new ForbiddenException('Owner and your own membership cannot be changed here');
-      const result=await tx.membership.update({where:{id},data:{role:dto.role}});await this.flows.audit(tx,r.actor,'member role updated','members',id);return result;
+  @Patch('orgs/current/members/:id') @Roles() async changeRole(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: RoleDto,
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const member = await tx.membership.findFirst({
+        where: { id, organizationId: r.actor.orgId },
+      });
+      if (!member) throw new NotFoundException();
+      if (member.role === 'OWNER' || member.userId === r.actor.userId)
+        throw new ForbiddenException(
+          'Owner and your own membership cannot be changed here',
+        );
+      const result = await tx.membership.update({
+        where: { id },
+        data: { role: dto.role },
+      });
+      await this.flows.audit(tx, r.actor, 'member role updated', 'members', id);
+      return result;
     });
   }
-  @Delete('orgs/current/members/:id') @Roles() async removeMember(@Req() r:AuthRequest,@Param('id') id:string) {
-    return this.db.$transaction(async tx=>{
-      const member=await tx.membership.findFirst({where:{id,organizationId:r.actor.orgId}});if(!member)throw new NotFoundException();
-      if(member.role==='OWNER'||member.userId===r.actor.userId)throw new ForbiddenException('Owner and your own membership cannot be removed here');
-      await tx.membership.delete({where:{id}});await tx.refreshSession.deleteMany({where:{userId:member.userId,organizationId:r.actor.orgId}});
-      await this.flows.audit(tx,r.actor,'member removed','members',id);return {ok:true};
+  @Delete('orgs/current/members/:id') @Roles() async removeMember(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.db.$transaction(async (tx) => {
+      const member = await tx.membership.findFirst({
+        where: { id, organizationId: r.actor.orgId },
+      });
+      if (!member) throw new NotFoundException();
+      if (member.role === 'OWNER' || member.userId === r.actor.userId)
+        throw new ForbiddenException(
+          'Owner and your own membership cannot be removed here',
+        );
+      await tx.membership.delete({ where: { id } });
+      await tx.refreshSession.deleteMany({
+        where: { userId: member.userId, organizationId: r.actor.orgId },
+      });
+      await this.flows.audit(tx, r.actor, 'member removed', 'members', id);
+      return { ok: true };
     });
   }
-  @Get('orgs/current/sequences') @Roles() async sequences(@Req() r:AuthRequest) {
-    const saved=await this.db.numberSequence.findMany({where:{organizationId:r.actor.orgId}});
-    return docKinds.map((key,i)=>saved.find(s=>s.key===key)??{key,prefix:['QT','SO','INV','PO'][i],nextValue:1});
+  @Get('orgs/current/sequences') @Roles() async sequences(
+    @Req() r: AuthRequest,
+  ) {
+    const saved = await this.db.numberSequence.findMany({
+      where: { organizationId: r.actor.orgId },
+    });
+    return docKinds.map(
+      (key, i) =>
+        saved.find((s) => s.key === key) ?? {
+          key,
+          prefix: ['QT', 'SO', 'INV', 'PO'][i],
+          nextValue: 1,
+        },
+    );
   }
-  @Patch('orgs/current/sequences/:key') @Roles() async sequence(@Req() r:AuthRequest,@Param('key') key:string,@Body() dto:SequenceDto) {
+  @Patch('orgs/current/sequences/:key') @Roles() async sequence(
+    @Req() r: AuthRequest,
+    @Param('key') key: string,
+    @Body() dto: SequenceDto,
+  ) {
     this.kind(key);
-    return this.db.$transaction(async tx=>{
-      const result=await tx.numberSequence.upsert({where:{organizationId_key:{organizationId:r.actor.orgId,key}},create:{organizationId:r.actor.orgId,key,prefix:dto.prefix},update:{prefix:dto.prefix}});
-      await this.flows.audit(tx,r.actor,'number prefix updated','sequences',result.id);return result;
+    return this.db.$transaction(async (tx) => {
+      const result = await tx.numberSequence.upsert({
+        where: { organizationId_key: { organizationId: r.actor.orgId, key } },
+        create: { organizationId: r.actor.orgId, key, prefix: dto.prefix },
+        update: { prefix: dto.prefix },
+      });
+      await this.flows.audit(
+        tx,
+        r.actor,
+        'number prefix updated',
+        'sequences',
+        result.id,
+      );
+      return result;
     });
   }
-  @Get('orgs/current/templates') @Roles() async template(@Req() r:AuthRequest) {
-    const o=await this.db.organization.findUniqueOrThrow({where:{id:r.actor.orgId}});return {subject:o.invoiceEmailSubject,body:o.invoiceEmailBody};
+  @Get('orgs/current/templates') @Roles() async template(
+    @Req() r: AuthRequest,
+  ) {
+    const o = await this.db.organization.findUniqueOrThrow({
+      where: { id: r.actor.orgId },
+    });
+    return { subject: o.invoiceEmailSubject, body: o.invoiceEmailBody };
   }
-  @Patch('orgs/current/templates') @Roles() async saveTemplate(@Req() r:AuthRequest,@Body() dto:TemplateDto) {
-    return this.db.$transaction(async tx=>{await tx.organization.update({where:{id:r.actor.orgId},data:{invoiceEmailSubject:dto.subject,invoiceEmailBody:dto.body}});await this.flows.audit(tx,r.actor,'document template updated','organization',r.actor.orgId);return dto;});
-  }
-  @Get('contacts/:id/activity') async contactActivity(@Req() r:AuthRequest,@Param('id') id:string) {
-    await this.catalog.get(r.actor,'contacts',id);
-    return this.db.auditLog.findMany({where:{organizationId:r.actor.orgId,entityType:'contacts',entityId:id},orderBy:{createdAt:'desc'},take:50,include:{user:{select:{name:true}}}});
-  }
-  @Post('contacts/:id/notes') @Roles('SALES') async addNote(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:NoteDto) {
-    if(!dto.text.trim())throw new BadRequestException('Write a note first');
-    return this.db.$transaction(async tx=>{
-      if(!await tx.contact.findFirst({where:{id,organizationId:r.actor.orgId}}))throw new NotFoundException();
-      return tx.auditLog.create({data:{organizationId:r.actor.orgId,userId:r.actor.userId,action:'added a note',entityType:'contacts',entityId:id,metaJson:{note:dto.text.trim()}}});
+  @Patch('orgs/current/templates') @Roles() async saveTemplate(
+    @Req() r: AuthRequest,
+    @Body() dto: TemplateDto,
+  ) {
+    return this.db.$transaction(async (tx) => {
+      await tx.organization.update({
+        where: { id: r.actor.orgId },
+        data: { invoiceEmailSubject: dto.subject, invoiceEmailBody: dto.body },
+      });
+      await this.flows.audit(
+        tx,
+        r.actor,
+        'document template updated',
+        'organization',
+        r.actor.orgId,
+      );
+      return dto;
     });
   }
-  @Get('reports/dashboard') dashboard(@Req() r: AuthRequest) { return this.reports.dashboard(r.actor); }
+  @Get('contacts/:id/activity') async contactActivity(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    await this.catalog.get(r.actor, 'contacts', id);
+    return this.db.auditLog.findMany({
+      where: {
+        organizationId: r.actor.orgId,
+        entityType: 'contacts',
+        entityId: id,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { user: { select: { name: true } } },
+    });
+  }
+  @Post('contacts/:id/notes') @Roles('SALES') async addNote(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: NoteDto,
+  ) {
+    if (!dto.text.trim()) throw new BadRequestException('Write a note first');
+    return this.db.$transaction(async (tx) => {
+      if (
+        !(await tx.contact.findFirst({
+          where: { id, organizationId: r.actor.orgId },
+        }))
+      )
+        throw new NotFoundException();
+      return tx.auditLog.create({
+        data: {
+          organizationId: r.actor.orgId,
+          userId: r.actor.userId,
+          action: 'added a note',
+          entityType: 'contacts',
+          entityId: id,
+          metaJson: { note: dto.text.trim() },
+        },
+      });
+    });
+  }
+  @Get('reports/dashboard') dashboard(@Req() r: AuthRequest) {
+    return this.reports.dashboard(r.actor);
+  }
   @Get('reports/accounts') async accounts(@Req() r: AuthRequest) {
     const where = { organizationId: r.actor.orgId };
-    const [payments, invoices, bills, stock] = await Promise.all([this.db.payment.aggregate({ where, _sum: { amount: true } }), this.db.invoice.findMany({ where: { ...where, status: { in: ['SENT','PARTIAL','PAID'] } } }), this.db.bill.findMany({ where }), this.reports.stock(r.actor, { page: 1, pageSize: 1 })]);
-    const paidOut = bills.reduce((n,b) => n + Number(b.amountPaid),0);
+    const [payments, invoices, bills, stock] = await Promise.all([
+      this.db.payment.aggregate({ where, _sum: { amount: true } }),
+      this.db.invoice.findMany({
+        where: { ...where, status: { in: ['SENT', 'PARTIAL', 'PAID'] } },
+      }),
+      this.db.bill.findMany({ where }),
+      this.reports.stock(r.actor, { page: 1, pageSize: 1 }),
+    ]);
+    const paidOut = bills.reduce((n, b) => n + Number(b.amountPaid), 0);
     return [
-      { code:'1000', name:'Recorded cash movement', type:'Asset', balance:Number(payments._sum.amount??0)-paidOut },
-      { code:'1100', name:'Accounts receivable', type:'Asset', balance:invoices.reduce((n,i)=>n+Number(i.total.sub(i.amountPaid)),0) },
-      { code:'1200', name:'Inventory', type:'Asset', balance:stock.valuation },
-      { code:'2000', name:'Accounts payable', type:'Liability', balance:bills.reduce((n,b)=>n+Number(b.total.sub(b.amountPaid)),0) },
-      { code:'4000', name:'Invoiced sales (before tax)', type:'Revenue', balance:invoices.reduce((n,i)=>n+Number(i.subtotal),0) },
-      { code:'2100', name:'Sales tax invoiced', type:'Liability', balance:invoices.reduce((n,i)=>n+Number(i.taxTotal),0) },
+      {
+        code: '1000',
+        name: 'Recorded cash movement',
+        type: 'Asset',
+        balance: Number(payments._sum.amount ?? 0) - paidOut,
+      },
+      {
+        code: '1100',
+        name: 'Accounts receivable',
+        type: 'Asset',
+        balance: invoices.reduce(
+          (n, i) => n + Number(i.total.sub(i.amountPaid)),
+          0,
+        ),
+      },
+      {
+        code: '1200',
+        name: 'Inventory',
+        type: 'Asset',
+        balance: stock.valuation,
+      },
+      {
+        code: '2000',
+        name: 'Accounts payable',
+        type: 'Liability',
+        balance: bills.reduce(
+          (n, b) => n + Number(b.total.sub(b.amountPaid)),
+          0,
+        ),
+      },
+      {
+        code: '4000',
+        name: 'Invoiced sales (before tax)',
+        type: 'Revenue',
+        balance: invoices.reduce((n, i) => n + Number(i.subtotal), 0),
+      },
+      {
+        code: '2100',
+        name: 'Sales tax invoiced',
+        type: 'Liability',
+        balance: invoices.reduce((n, i) => n + Number(i.taxTotal), 0),
+      },
     ];
   }
-  @Get('reports/ar-aging') aging(@Req() r: AuthRequest) { return this.reports.aging(r.actor); }
-  @Get('reports/sales') sales(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.sales(r.actor,q); }
-  @Get('reports/profit-loss') profitLoss(@Req() r: AuthRequest,@Query() q:ListDto){return this.reports.profitLoss(r.actor,q);}
-  @Get('stock') stock(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.stock(r.actor,q); }
-  @Post('stock/adjustments') @Roles('INVENTORY') adjust(@Req() r: AuthRequest, @Body() dto: AdjustmentDto) { return this.flows.adjust(r.actor,dto); }
-  @Get('stock/movements') async moves(@Req() r: AuthRequest, @Query() q: ListDto) {
-    const where = { organizationId: r.actor.orgId };
-    const [data, total, products, warehouses] = await Promise.all([this.db.stockMovement.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (q.page-1)*q.pageSize, take: q.pageSize }), this.db.stockMovement.count({ where }), this.db.product.findMany({ where, select: { id: true, name: true, sku: true } }), this.db.warehouse.findMany({ where, select: { id: true, name: true } })]);
-    return { data: data.map(m => ({ ...m, product: products.find(p => p.id === m.productId), warehouse: warehouses.find(w => w.id === m.warehouseId) })), meta: { page: q.page, pageSize: q.pageSize,total } };
+  @Get('reports/ar-aging') aging(@Req() r: AuthRequest) {
+    return this.reports.aging(r.actor);
   }
-  @Get('audit-logs') @Roles() async audit(@Req() r: AuthRequest, @Query() q: ListDto) {
+  @Get('reports/sales') sales(@Req() r: AuthRequest, @Query() q: ListDto) {
+    return this.reports.sales(r.actor, q);
+  }
+  @Get('reports/profit-loss') profitLoss(
+    @Req() r: AuthRequest,
+    @Query() q: ListDto,
+  ) {
+    return this.reports.profitLoss(r.actor, q);
+  }
+  @Get('stock') stock(@Req() r: AuthRequest, @Query() q: ListDto) {
+    return this.reports.stock(r.actor, q);
+  }
+  @Post('stock/adjustments') @Roles('INVENTORY') adjust(
+    @Req() r: AuthRequest,
+    @Body() dto: AdjustmentDto,
+  ) {
+    return this.flows.adjust(r.actor, dto);
+  }
+  @Get('stock/movements') async moves(
+    @Req() r: AuthRequest,
+    @Query() q: ListDto,
+  ) {
     const where = { organizationId: r.actor.orgId };
-    const [data,total] = await Promise.all([this.db.auditLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (q.page-1)*q.pageSize,take:q.pageSize,include:{user:{select:{name:true}}} }),this.db.auditLog.count({where})]);
-    return {data,meta:{page:q.page,pageSize:q.pageSize,total}};
+    const [data, total, products, warehouses] = await Promise.all([
+      this.db.stockMovement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+      }),
+      this.db.stockMovement.count({ where }),
+      this.db.product.findMany({
+        where,
+        select: { id: true, name: true, sku: true },
+      }),
+      this.db.warehouse.findMany({ where, select: { id: true, name: true } }),
+    ]);
+    return {
+      data: data.map((m) => ({
+        ...m,
+        product: products.find((p) => p.id === m.productId),
+        warehouse: warehouses.find((w) => w.id === m.warehouseId),
+      })),
+      meta: { page: q.page, pageSize: q.pageSize, total },
+    };
+  }
+  @Get('audit-logs') @Roles() async audit(
+    @Req() r: AuthRequest,
+    @Query() q: ListDto,
+  ) {
+    const where = { organizationId: r.actor.orgId };
+    const [data, total] = await Promise.all([
+      this.db.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        include: { user: { select: { name: true } } },
+      }),
+      this.db.auditLog.count({ where }),
+    ]);
+    return { data, meta: { page: q.page, pageSize: q.pageSize, total } };
   }
   @Get('payments') async payments(@Req() r: AuthRequest, @Query() q: ListDto) {
     const where = { organizationId: r.actor.orgId };
-    const [data,total] = await Promise.all([this.db.payment.findMany({ where,orderBy:{createdAt:'desc'},skip:(q.page-1)*q.pageSize,take:q.pageSize,include:{allocations:{include:{invoice:{select:{number:true,id:true}}}}} }),this.db.payment.count({where})]);
-    return {data,meta:{page:q.page,pageSize:q.pageSize,total}};
+    const [data, total] = await Promise.all([
+      this.db.payment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        include: {
+          allocations: {
+            include: { invoice: { select: { number: true, id: true } } },
+          },
+        },
+      }),
+      this.db.payment.count({ where }),
+    ]);
+    return { data, meta: { page: q.page, pageSize: q.pageSize, total } };
   }
-  @Post('payments') @Roles('FINANCE') payment(@Req() r: AuthRequest, @Body() dto: PaymentDto) { return this.flows.payment(r.actor,dto); }
+  @Post('payments') @Roles('FINANCE') payment(
+    @Req() r: AuthRequest,
+    @Body() dto: PaymentDto,
+  ) {
+    return this.flows.payment(r.actor, dto);
+  }
   @Get('bills') async bills(@Req() r: AuthRequest, @Query() q: ListDto) {
-    const where={organizationId:r.actor.orgId}; const [data,total]=await Promise.all([this.db.bill.findMany({where,orderBy:{createdAt:'desc'},skip:(q.page-1)*q.pageSize,take:q.pageSize}),this.db.bill.count({where})]);return {data,meta:{page:q.page,pageSize:q.pageSize,total}};
+    const where = { organizationId: r.actor.orgId };
+    const [data, total] = await Promise.all([
+      this.db.bill.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+      }),
+      this.db.bill.count({ where }),
+    ]);
+    return { data, meta: { page: q.page, pageSize: q.pageSize, total } };
   }
-  @Post('purchase-orders/:id/bill') @Roles('FINANCE') async bill(@Req() r: AuthRequest,@Param('id') id:string) {
-    return this.db.$transaction(async tx=>{
-      const po=await tx.purchaseOrder.findFirst({where:{id,organizationId:r.actor.orgId},include:{vendor:true}}); if(!po)throw new NotFoundException();
-      if(!['PARTIAL','PAID'].includes(po.status))throw new BadRequestException('Receive goods before creating a bill');
-      const existing=await tx.bill.findUnique({where:{purchaseOrderId:id}});if(existing)return existing;
-      const bill=await tx.bill.create({data:{organizationId:r.actor.orgId,purchaseOrderId:id,number:`BILL-${po.number}`,vendorName:po.vendor.name,total:po.total,dueDate:new Date(Date.now()+30*86400000)}});
-      await this.flows.audit(tx,r.actor,'bill created','bills',bill.id);return bill;
-    },{isolationLevel:'Serializable'});
+  @Post('purchase-orders/:id/bill') @Roles('FINANCE') async bill(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.db.$transaction(
+      async (tx) => {
+        const po = await tx.purchaseOrder.findFirst({
+          where: { id, organizationId: r.actor.orgId },
+          include: { vendor: true },
+        });
+        if (!po) throw new NotFoundException();
+        if (!['PARTIAL', 'PAID'].includes(po.status))
+          throw new BadRequestException('Receive goods before creating a bill');
+        const existing = await tx.bill.findUnique({
+          where: { purchaseOrderId: id },
+        });
+        if (existing) return existing;
+        const bill = await tx.bill.create({
+          data: {
+            organizationId: r.actor.orgId,
+            purchaseOrderId: id,
+            number: `BILL-${po.number}`,
+            vendorName: po.vendor.name,
+            total: po.total,
+            dueDate: new Date(Date.now() + 30 * 86400000),
+          },
+        });
+        await this.flows.audit(tx, r.actor, 'bill created', 'bills', bill.id);
+        return bill;
+      },
+      { isolationLevel: 'Serializable' },
+    );
   }
-  @Post('bills/:id/pay') @Roles('FINANCE') async payBill(@Req() r:AuthRequest,@Param('id') id:string) {
-    return this.db.$transaction(async tx=>{
-      const bill=await tx.bill.findFirst({where:{id,organizationId:r.actor.orgId}});if(!bill)throw new NotFoundException();if(bill.status==='PAID')throw new BadRequestException('Bill already paid');
-      const updated=await tx.bill.update({where:{id},data:{amountPaid:bill.total,status:'PAID'}});await this.flows.audit(tx,r.actor,'bill paid','bills',id);return updated;
-    },{isolationLevel:'Serializable'});
+  @Post('bills/:id/pay') @Roles('FINANCE') async payBill(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.db.$transaction(
+      async (tx) => {
+        const bill = await tx.bill.findFirst({
+          where: { id, organizationId: r.actor.orgId },
+        });
+        if (!bill) throw new NotFoundException();
+        if (bill.status === 'PAID')
+          throw new BadRequestException('Bill already paid');
+        const updated = await tx.bill.update({
+          where: { id },
+          data: { amountPaid: bill.total, status: 'PAID' },
+        });
+        await this.flows.audit(tx, r.actor, 'bill paid', 'bills', id);
+        return updated;
+      },
+      { isolationLevel: 'Serializable' },
+    );
   }
-  @Post('quotes/:id/convert') @Roles('SALES') convert(@Req() r: AuthRequest,@Param('id') id:string) { return this.flows.convert(r.actor,id); }
-  @Post('sales-orders/:id/invoice') @Roles('SALES','FINANCE') invoice(@Req() r:AuthRequest,@Param('id') id:string) { return this.flows.invoice(r.actor,id); }
-  @Post('sales-orders/:id/ship') @Roles('INVENTORY') ship(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:WarehouseDto) { return this.flows.ship(r.actor,id,dto.warehouseId); }
-  @Post('invoices/:id/send') @Roles('FINANCE') send(@Req() r:AuthRequest,@Param('id') id:string) { return this.flows.send(r.actor,id); }
-  @Post('purchase-orders/:id/receive') @Roles('INVENTORY') receive(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:ReceiveDto) { return this.flows.receive(r.actor,id,dto); }
-  @Post(':kind/:id/void') cancel(@Req() r:AuthRequest,@Param('kind') k:string,@Param('id') id:string) { return this.flows.cancel(r.actor,this.kind(k),id); }
-  @Patch(docKinds.map(k=>`${k}/:id`)) updateDoc(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:DocumentDto) { return this.flows.update(r.actor,this.kind(r.path.split('/')[1]),id,dto); }
+  @Post('quotes/:id/convert') @Roles('SALES') convert(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.flows.convert(r.actor, id);
+  }
+  @Post('sales-orders/:id/invoice') @Roles('SALES', 'FINANCE') invoice(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.flows.invoice(r.actor, id);
+  }
+  @Post('sales-orders/:id/ship') @Roles('INVENTORY') ship(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: WarehouseDto,
+  ) {
+    return this.flows.ship(r.actor, id, dto.warehouseId);
+  }
+  @Post('invoices/:id/send') @Roles('FINANCE') send(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.flows.send(r.actor, id);
+  }
+  @Post('purchase-orders/:id/receive') @Roles('INVENTORY') receive(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: ReceiveDto,
+  ) {
+    return this.flows.receive(r.actor, id, dto);
+  }
+  @Post(':kind/:id/void') cancel(
+    @Req() r: AuthRequest,
+    @Param('kind') k: string,
+    @Param('id') id: string,
+  ) {
+    return this.flows.cancel(r.actor, this.kind(k), id);
+  }
+  @Patch(docKinds.map((k) => `${k}/:id`)) updateDoc(
+    @Req() r: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: DocumentDto,
+  ) {
+    return this.flows.update(r.actor, this.kind(r.path.split('/')[1]), id, dto);
+  }
 
-  @Get(':resource') list(@Req() r:AuthRequest,@Param('resource') resource:string,@Query() q:ListDto) {
-    return masters.includes(resource) ? this.catalog.list(r.actor,resource,q) : this.flows.list(r.actor,this.kind(resource),q);
+  @Get(':resource') list(
+    @Req() r: AuthRequest,
+    @Param('resource') resource: string,
+    @Query() q: ListDto,
+  ) {
+    return masters.includes(resource)
+      ? this.catalog.list(r.actor, resource, q)
+      : this.flows.list(r.actor, this.kind(resource), q);
   }
-  @Get(':resource/:id') get(@Req() r:AuthRequest,@Param('resource') resource:string,@Param('id') id:string) {
-    return masters.includes(resource) ? this.catalog.get(r.actor,resource,id) : this.flows.detail(r.actor,this.kind(resource),id);
+  @Get(':resource/:id') get(
+    @Req() r: AuthRequest,
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+  ) {
+    return masters.includes(resource)
+      ? this.catalog.get(r.actor, resource, id)
+      : this.flows.detail(r.actor, this.kind(resource), id);
   }
-  @Post(masters) createMaster(@Req() r:AuthRequest,@Body() dto:MasterDto) { return this.catalog.save(r.actor,r.path.slice(1),dto); }
-  @Patch(':resource/:id') updateMaster(@Req() r:AuthRequest,@Param('resource') resource:string,@Param('id') id:string,@Body() dto:MasterDto) { return this.catalog.save(r.actor,resource,dto,id); }
-  @Delete(':resource/:id') deleteMaster(@Req() r:AuthRequest,@Param('resource') resource:string,@Param('id') id:string) { return this.catalog.remove(r.actor,resource,id); }
-  @Post([...docKinds]) createDoc(@Req() r:AuthRequest,@Body() dto:DocumentDto) { return this.flows.create(r.actor,this.kind(r.path.slice(1)),dto); }
+  @Post(masters) createMaster(@Req() r: AuthRequest, @Body() dto: MasterDto) {
+    return this.catalog.save(r.actor, r.path.slice(1), dto);
+  }
+  @Patch(':resource/:id') updateMaster(
+    @Req() r: AuthRequest,
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+    @Body() dto: MasterDto,
+  ) {
+    return this.catalog.save(r.actor, resource, dto, id);
+  }
+  @Delete(':resource/:id') deleteMaster(
+    @Req() r: AuthRequest,
+    @Param('resource') resource: string,
+    @Param('id') id: string,
+  ) {
+    return this.catalog.remove(r.actor, resource, id);
+  }
+  @Post([...docKinds]) createDoc(
+    @Req() r: AuthRequest,
+    @Body() dto: DocumentDto,
+  ) {
+    return this.flows.create(r.actor, this.kind(r.path.slice(1)), dto);
+  }
 }

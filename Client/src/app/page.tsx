@@ -1,6 +1,151 @@
 ﻿import Link from 'next/link';
-import { ArrowUpRight, ArrowRight, Boxes, Workflow, ChartNoAxesCombined, Check, Layers3 } from 'lucide-react';
+import {
+  ArrowUpRight,
+  ArrowRight,
+  Boxes,
+  Workflow,
+  ChartNoAxesCombined,
+  Check,
+  Layers3,
+} from 'lucide-react';
 export default function Home() {
-  const features=[{Icon:Workflow,title:'From first hello to paid.',text:'Keep customers, quotes, orders and invoices connected. Every next step is right where you need it.'},{Icon:Boxes,title:'Stock you can count on.',text:'Know what’s available, what’s running low and what’s on its way. Receive goods without the guesswork.'},{Icon:ChartNoAxesCombined,title:'See the whole picture.',text:'Revenue, receivables and stock alerts come together in a calm, clear dashboard.'}];
-  return <div className="marketing"><nav className="marketing-nav"><Link href="/" className="brand"><span className="brand-mark">l</span>ledgerflow</Link><div className="row desktop-only"><a href="#platform">Platform</a><a href="#start">Getting started</a></div><div className="row"><Link href="/login" className="button">Log in</Link><Link href="/register" className="button primary">Get started <ArrowUpRight size={17}/></Link></div></nav><main><section className="marketing-hero"><div className="hero-pill"><Layers3 size={15}/> A little less busy. A lot more business.</div><h1>Your business.<br/>Finally, <em>in flow.</em></h1><p className="hero-description">Customers, inventory, sales and finances. One connected workspace that brings the whole picture into focus.</p><div className="hero-actions"><Link href="/register" className="button primary">Create your workspace <ArrowRight size={18}/></Link><Link href="/login" className="button">Open Ledgerflow <ArrowUpRight size={18}/></Link></div><p className="hero-footnote">Built for growing teams. No credit card required.</p><div className="product-preview" aria-label="Illustrative dashboard with example data"><div className="preview-sidebar"><strong>ledgerflow</strong><span>◈ Overview</span><span>◎ Customers</span><span>↗ Sales</span><span>▧ Inventory</span><span>◷ Purchasing</span><span>▤ Finance</span></div><div className="preview-content"><div className="spread"><h2>Business at a glance</h2><span style={{color:'#adcca1'}}>● In flow</span></div><div className="preview-stats">{[['Revenue','$48,250'],['Open receivables','$12,480'],['Orders today','24']].map(([label,value])=><div className="preview-stat" key={label}>{label}<strong>{value}</strong></div>)}</div><div className="preview-chart" aria-hidden="true">{[30,45,35,58,48,68,56,77,66,90,79,100,88,115].map((h,i)=><span key={i} style={{height:h}}/>)}</div><p style={{marginTop:14,color:'#a9b9ad'}}>Illustrative workspace · Your real numbers, all in one place</p></div></div></section><section className="marketing-section" id="platform"><p className="eyebrow" style={{color:'#657361',marginBottom:14}}>ONE WORKSPACE. EVERY MOVING PART.</p><h2>Less switching tabs.<br/>More moving forward.</h2><div className="feature-grid">{features.map(({Icon,title,text})=><article className="feature-card" key={title}><Icon size={28}/><h3>{title}</h3><p>{text}</p></article>)}</div></section><section className="marketing-section" id="start" style={{paddingTop:0}}><div className="marketing-cta spread"><div><h2>Make room for better work.</h2><p style={{marginTop:10,color:'#637369'}}>Start with one workspace. Bring your whole team.</p><div className="row" style={{marginTop:15}}><Check size={16}/> Role-based access <Check size={16}/> Connected workflows</div></div><Link href="/register" className="button primary">Get started <ArrowRight size={18}/></Link></div></section></main><footer className="marketing-footer spread"><span>© 2026 Ledgerflow</span><span>Run the business. Find your flow.</span></footer></div>;
+  const features = [
+    {
+      Icon: Workflow,
+      title: 'From first hello to paid.',
+      text: 'Keep customers, quotes, orders and invoices connected. Every next step is right where you need it.',
+    },
+    {
+      Icon: Boxes,
+      title: 'Stock you can count on.',
+      text: 'Know what’s available, what’s running low and what’s on its way. Receive goods without the guesswork.',
+    },
+    {
+      Icon: ChartNoAxesCombined,
+      title: 'See the whole picture.',
+      text: 'Revenue, receivables and stock alerts come together in a calm, clear dashboard.',
+    },
+  ];
+  return (
+    <div className="marketing">
+      <nav className="marketing-nav">
+        <Link href="/" className="brand">
+          <span className="brand-mark">l</span>ledgerflow
+        </Link>
+        <div className="row desktop-only">
+          <a href="#platform">Platform</a>
+          <a href="#start">Getting started</a>
+        </div>
+        <div className="row">
+          <Link href="/login" className="button">
+            Log in
+          </Link>
+          <Link href="/register" className="button primary">
+            Get started <ArrowUpRight size={17} />
+          </Link>
+        </div>
+      </nav>
+      <main>
+        <section className="marketing-hero">
+          <div className="hero-pill">
+            <Layers3 size={15} /> A little less busy. A lot more business.
+          </div>
+          <h1>
+            Your business.
+            <br />
+            Finally, <em>in flow.</em>
+          </h1>
+          <p className="hero-description">
+            Customers, inventory, sales and finances. One connected workspace that brings the whole
+            picture into focus.
+          </p>
+          <div className="hero-actions">
+            <Link href="/register" className="button primary">
+              Create your workspace <ArrowRight size={18} />
+            </Link>
+            <Link href="/login" className="button">
+              Open Ledgerflow <ArrowUpRight size={18} />
+            </Link>
+          </div>
+          <p className="hero-footnote">Built for growing teams. No credit card required.</p>
+          <div className="product-preview" aria-label="Illustrative dashboard with example data">
+            <div className="preview-sidebar">
+              <strong>ledgerflow</strong>
+              <span>◈ Overview</span>
+              <span>◎ Customers</span>
+              <span>↗ Sales</span>
+              <span>▧ Inventory</span>
+              <span>◷ Purchasing</span>
+              <span>▤ Finance</span>
+            </div>
+            <div className="preview-content">
+              <div className="spread">
+                <h2>Business at a glance</h2>
+                <span style={{ color: '#adcca1' }}>● In flow</span>
+              </div>
+              <div className="preview-stats">
+                {[
+                  ['Revenue', '$48,250'],
+                  ['Open receivables', '$12,480'],
+                  ['Orders today', '24'],
+                ].map(([label, value]) => (
+                  <div className="preview-stat" key={label}>
+                    {label}
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="preview-chart" aria-hidden="true">
+                {[30, 45, 35, 58, 48, 68, 56, 77, 66, 90, 79, 100, 88, 115].map((h, i) => (
+                  <span key={i} style={{ height: h }} />
+                ))}
+              </div>
+              <p style={{ marginTop: 14, color: '#a9b9ad' }}>
+                Illustrative workspace · Your real numbers, all in one place
+              </p>
+            </div>
+          </div>
+        </section>
+        <section className="marketing-section" id="platform">
+          <p className="eyebrow" style={{ color: '#657361', marginBottom: 14 }}>
+            ONE WORKSPACE. EVERY MOVING PART.
+          </p>
+          <h2>
+            Less switching tabs.
+            <br />
+            More moving forward.
+          </h2>
+          <div className="feature-grid">
+            {features.map(({ Icon, title, text }) => (
+              <article className="feature-card" key={title}>
+                <Icon size={28} />
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section className="marketing-section" id="start" style={{ paddingTop: 0 }}>
+          <div className="marketing-cta spread">
+            <div>
+              <h2>Make room for better work.</h2>
+              <p style={{ marginTop: 10, color: '#637369' }}>
+                Start with one workspace. Bring your whole team.
+              </p>
+              <div className="row" style={{ marginTop: 15 }}>
+                <Check size={16} /> Role-based access <Check size={16} /> Connected workflows
+              </div>
+            </div>
+            <Link href="/register" className="button primary">
+              Get started <ArrowRight size={18} />
+            </Link>
+          </div>
+        </section>
+      </main>
+      <footer className="marketing-footer spread">
+        <span>© 2026 Ledgerflow</span>
+        <span>Run the business. Find your flow.</span>
+      </footer>
+    </div>
+  );
 }

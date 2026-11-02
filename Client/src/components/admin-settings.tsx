@@ -3,18 +3,232 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery,useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { api,errorMessage } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { useWorkspace } from '@/hooks/use-workspace';
-import { Button,Modal,Skeleton,ErrorState } from './ui';
+import { Button, Modal, Skeleton, ErrorState } from './ui';
 
-const prefixSchema=z.object({prefix:z.string().regex(/^[A-Z][A-Z0-9-]{0,11}$/,'Use 1–12 uppercase letters, digits or hyphens')});
-function PrefixForm({sequence}:{sequence:{key:string;prefix:string;nextValue:number}}){const {orgId}=useWorkspace();const cache=useQueryClient();const {register,handleSubmit,formState:{isSubmitting,errors}}=useForm<z.infer<typeof prefixSchema>>({resolver:zodResolver(prefixSchema),defaultValues:{prefix:sequence.prefix}});return <form onSubmit={handleSubmit(async v=>{try{await api.patch(`/orgs/current/sequences/${sequence.key}`,v);await cache.invalidateQueries({queryKey:['org',orgId,'sequences']});toast.success('Number prefix saved');}catch(e){toast.error(errorMessage(e));}})}><label style={{textTransform:'capitalize'}}>{sequence.key.replaceAll('-',' ')}<div className="row"><input aria-label={`${sequence.key} prefix`} maxLength={12} {...register('prefix')}/><Button busy={isSubmitting} type="submit">Save</Button></div></label>{errors.prefix&&<p className="field-error">{errors.prefix.message}</p>}<p className="muted" style={{marginTop:7}}>Next: {sequence.prefix}-{String(sequence.nextValue).padStart(5,'0')}</p></form>;}
-const templateSchema=z.object({subject:z.string().min(1).max(200),body:z.string().min(1).max(5000)});
-function TemplateForm({initial}:{initial:z.infer<typeof templateSchema>}){const {register,handleSubmit,formState:{isSubmitting}}=useForm<z.infer<typeof templateSchema>>({resolver:zodResolver(templateSchema),defaultValues:initial});return <form className="stack" onSubmit={handleSubmit(async v=>{try{await api.patch('/orgs/current/templates',v);toast.success('Template saved');}catch(e){toast.error(errorMessage(e));}})}><label>Email subject<input required {...register('subject')}/></label><label>Email body<textarea required {...register('body')} rows={5}/></label><p className="muted">Placeholders: {'{{number}}'}, {'{{organization}}'}. Templates are stored for your team; automatic email delivery is a future integration.</p><Button type="submit" busy={isSubmitting}>Save template</Button></form>;}
-export function AdminSettings(){const {orgId}=useWorkspace();const sequences=useQuery({queryKey:['org',orgId,'sequences'],queryFn:()=>api.get<{key:string;prefix:string;nextValue:number}[]>('/orgs/current/sequences').then(r=>r.data),enabled:!!orgId});const template=useQuery({queryKey:['org',orgId,'templates'],queryFn:()=>api.get<z.infer<typeof templateSchema>>('/orgs/current/templates').then(r=>r.data),enabled:!!orgId});return <><section className="panel"><div className="panel-heading"><h2>Document numbering</h2><p className="muted">A familiar prefix. A reliable sequence.</p></div><div className="panel-body stack">{sequences.isPending?<Skeleton rows={2}/>:sequences.isError?<ErrorState message={errorMessage(sequences.error)} retry={()=>sequences.refetch()}/>:sequences.data.map(s=><PrefixForm sequence={s} key={s.key}/>)}<p className="muted">Changes apply to new documents. Existing numbers stay as issued.</p></div></section><section className="panel"><div className="panel-heading"><h2>Invoice email template</h2></div><div className="panel-body">{template.isPending?<Skeleton rows={2}/>:template.isError?<ErrorState message={errorMessage(template.error)} retry={()=>template.refetch()}/>:<TemplateForm initial={template.data}/>}</div></section></>;}
-export function MemberControls({member}:{member:{id:string;role:string;user:{id?:string;name:string;email:string}}}){const {orgId,user}=useWorkspace();const cache=useQueryClient();const [remove,setRemove]=useState(false);const [busy,setBusy]=useState(false);const immutable=member.role==='OWNER'||member.user.email===user?.email;
-  async function update(role:string){setBusy(true);try{await api.patch(`/orgs/current/members/${member.id}`,{role});await cache.invalidateQueries({queryKey:['org',orgId,'members']});toast.success('Role updated');}catch(e){toast.error(errorMessage(e));}finally{setBusy(false);}}
-  return <><div className="row">{immutable?<span className="badge" style={{textTransform:'lowercase'}}>{member.role}</span>:<><select aria-label={`Role for ${member.user.name}`} value={member.role} disabled={busy} onChange={e=>update(e.target.value)}>{['VIEWER','SALES','INVENTORY','FINANCE','ADMIN'].map(r=><option key={r} value={r}>{r.toLowerCase()}</option>)}</select><Button variant="danger" onClick={()=>setRemove(true)}>Remove</Button></>}</div><Modal open={remove} onOpenChange={setRemove} title="Remove workspace access?" description={`${member.user.name} will lose access to this workspace. Existing records are kept.`}><div className="form-actions"><Button onClick={()=>setRemove(false)}>Cancel</Button><Button variant="danger" busy={busy} onClick={async()=>{setBusy(true);try{await api.delete(`/orgs/current/members/${member.id}`);await cache.invalidateQueries({queryKey:['org',orgId,'members']});setRemove(false);toast.success('Access removed');}catch(e){toast.error(errorMessage(e));}finally{setBusy(false);}}}>Remove access</Button></div></Modal></>;
+const prefixSchema = z.object({
+  prefix: z
+    .string()
+    .regex(/^[A-Z][A-Z0-9-]{0,11}$/, 'Use 1–12 uppercase letters, digits or hyphens'),
+});
+function PrefixForm({
+  sequence,
+}: {
+  sequence: { key: string; prefix: string; nextValue: number };
+}) {
+  const { orgId } = useWorkspace();
+  const cache = useQueryClient();
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting, errors },
+  } = useForm<z.infer<typeof prefixSchema>>({
+    resolver: zodResolver(prefixSchema),
+    defaultValues: { prefix: sequence.prefix },
+  });
+  return (
+    <form
+      onSubmit={handleSubmit(async (v) => {
+        try {
+          await api.patch(`/orgs/current/sequences/${sequence.key}`, v);
+          await cache.invalidateQueries({ queryKey: ['org', orgId, 'sequences'] });
+          toast.success('Number prefix saved');
+        } catch (e) {
+          toast.error(errorMessage(e));
+        }
+      })}
+    >
+      <label style={{ textTransform: 'capitalize' }}>
+        {sequence.key.replaceAll('-', ' ')}
+        <div className="row">
+          <input aria-label={`${sequence.key} prefix`} maxLength={12} {...register('prefix')} />
+          <Button busy={isSubmitting} type="submit">
+            Save
+          </Button>
+        </div>
+      </label>
+      {errors.prefix && <p className="field-error">{errors.prefix.message}</p>}
+      <p className="muted" style={{ marginTop: 7 }}>
+        Next: {sequence.prefix}-{String(sequence.nextValue).padStart(5, '0')}
+      </p>
+    </form>
+  );
+}
+const templateSchema = z.object({
+  subject: z.string().min(1).max(200),
+  body: z.string().min(1).max(5000),
+});
+function TemplateForm({ initial }: { initial: z.infer<typeof templateSchema> }) {
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<z.infer<typeof templateSchema>>({
+    resolver: zodResolver(templateSchema),
+    defaultValues: initial,
+  });
+  return (
+    <form
+      className="stack"
+      onSubmit={handleSubmit(async (v) => {
+        try {
+          await api.patch('/orgs/current/templates', v);
+          toast.success('Template saved');
+        } catch (e) {
+          toast.error(errorMessage(e));
+        }
+      })}
+    >
+      <label>
+        Email subject
+        <input required {...register('subject')} />
+      </label>
+      <label>
+        Email body
+        <textarea required {...register('body')} rows={5} />
+      </label>
+      <p className="muted">
+        Placeholders: {'{{number}}'}, {'{{organization}}'}. Templates are stored for your team;
+        automatic email delivery is a future integration.
+      </p>
+      <Button type="submit" busy={isSubmitting}>
+        Save template
+      </Button>
+    </form>
+  );
+}
+export function AdminSettings() {
+  const { orgId } = useWorkspace();
+  const sequences = useQuery({
+    queryKey: ['org', orgId, 'sequences'],
+    queryFn: () =>
+      api
+        .get<{ key: string; prefix: string; nextValue: number }[]>('/orgs/current/sequences')
+        .then((r) => r.data),
+    enabled: !!orgId,
+  });
+  const template = useQuery({
+    queryKey: ['org', orgId, 'templates'],
+    queryFn: () =>
+      api.get<z.infer<typeof templateSchema>>('/orgs/current/templates').then((r) => r.data),
+    enabled: !!orgId,
+  });
+  return (
+    <>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>Document numbering</h2>
+          <p className="muted">A familiar prefix. A reliable sequence.</p>
+        </div>
+        <div className="panel-body stack">
+          {sequences.isPending ? (
+            <Skeleton rows={2} />
+          ) : sequences.isError ? (
+            <ErrorState message={errorMessage(sequences.error)} retry={() => sequences.refetch()} />
+          ) : (
+            sequences.data.map((s) => <PrefixForm sequence={s} key={s.key} />)
+          )}
+          <p className="muted">Changes apply to new documents. Existing numbers stay as issued.</p>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-heading">
+          <h2>Invoice email template</h2>
+        </div>
+        <div className="panel-body">
+          {template.isPending ? (
+            <Skeleton rows={2} />
+          ) : template.isError ? (
+            <ErrorState message={errorMessage(template.error)} retry={() => template.refetch()} />
+          ) : (
+            <TemplateForm initial={template.data} />
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+export function MemberControls({
+  member,
+}: {
+  member: { id: string; role: string; user: { id?: string; name: string; email: string } };
+}) {
+  const { orgId, user } = useWorkspace();
+  const cache = useQueryClient();
+  const [remove, setRemove] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const immutable = member.role === 'OWNER' || member.user.email === user?.email;
+  async function update(role: string) {
+    setBusy(true);
+    try {
+      await api.patch(`/orgs/current/members/${member.id}`, { role });
+      await cache.invalidateQueries({ queryKey: ['org', orgId, 'members'] });
+      toast.success('Role updated');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <div className="row">
+        {immutable ? (
+          <span className="badge" style={{ textTransform: 'lowercase' }}>
+            {member.role}
+          </span>
+        ) : (
+          <>
+            <select
+              aria-label={`Role for ${member.user.name}`}
+              value={member.role}
+              disabled={busy}
+              onChange={(e) => update(e.target.value)}
+            >
+              {['VIEWER', 'SALES', 'INVENTORY', 'FINANCE', 'ADMIN'].map((r) => (
+                <option key={r} value={r}>
+                  {r.toLowerCase()}
+                </option>
+              ))}
+            </select>
+            <Button variant="danger" onClick={() => setRemove(true)}>
+              Remove
+            </Button>
+          </>
+        )}
+      </div>
+      <Modal
+        open={remove}
+        onOpenChange={setRemove}
+        title="Remove workspace access?"
+        description={`${member.user.name} will lose access to this workspace. Existing records are kept.`}
+      >
+        <div className="form-actions">
+          <Button onClick={() => setRemove(false)}>Cancel</Button>
+          <Button
+            variant="danger"
+            busy={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.delete(`/orgs/current/members/${member.id}`);
+                await cache.invalidateQueries({ queryKey: ['org', orgId, 'members'] });
+                setRemove(false);
+                toast.success('Access removed');
+              } catch (e) {
+                toast.error(errorMessage(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Remove access
+          </Button>
+        </div>
+      </Modal>
+    </>
+  );
 }

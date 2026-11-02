@@ -3,7 +3,16 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Download, ChevronLeft, ChevronRight, Pencil, List, Columns3 } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  List,
+  Columns3,
+} from 'lucide-react';
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy';
 import { toast } from 'sonner';
 import { modules, canWrite, canRead, documentHref } from '@/lib/modules';
@@ -16,25 +25,515 @@ import { Button, Badge, Empty, Skeleton, ErrorState, Modal } from './ui';
 import { CreateDialog } from './record-form';
 import { StockAdjustment } from './stock-adjustment';
 
-export function ModuleTabs({moduleKey}:{moduleKey:string}){const c=modules[moduleKey];const {user}=useWorkspace();return <nav className="module-tabs" aria-label="Module navigation">{c.tabs.filter(([,href])=>canRead(user?.role??'VIEWER',href.endsWith('/orders')?'sales-orders':href.endsWith('/pos')?'purchase-orders':href.split('/').at(-1)??'')).map(([label,href])=><Link className={href.endsWith('/'+moduleKey)?'active':''} key={href} href={href}>{label}</Link>)}</nav>;}
-export function ListPage({moduleKey}:{moduleKey:string}){
-  const c=modules[moduleKey];const searchParams=useSearchParams();const {user,org,orgId}=useWorkspace();const cache=useQueryClient();
-  const [q,setQ]=useState('');const [debounced,setDebounced]=useState('');const [page,setPage]=useState(1);const [status,setStatus]=useState('');const [low,setLow]=useState(searchParams.get('low')==='true');const [open,setOpen]=useState(searchParams.has('new'));const [edit,setEdit]=useState<Entity>();const [exporting,setExporting]=useState(false);const [kanban,setKanban]=useState(false);const [pay,setPay]=useState<Entity>();const [paying,setPaying]=useState(false);
-  useEffect(()=>{const id=setTimeout(()=>{setDebounced(q);setPage(1);},250);return()=>clearTimeout(id);},[q]);
-  const endpoint=moduleKey==='products'&&low?'stock':c.endpoint;const params={q:debounced,page,pageSize:20,...(status?{status}:{}),...(low?{low:'true'}:{})};
-  const query=useList(endpoint,params);const allowed=!!user&&canWrite(user.role,c.roles);const readonly=['payments','bills','movements'].includes(moduleKey);
-  const href=(e:Entity)=>c.document?documentHref(c.endpoint,e.id):`/app/${moduleKey==='contacts'?'crm/contacts':moduleKey==='products'?'inventory/products':moduleKey}/${e.id}`;
-  const primary:LegacyColumnDef<Entity,unknown>={id:'name',accessorFn:e=>e.name??e.number??e.reference??e.id,header:c.document?'Document':moduleKey==='payments'?'Payment':moduleKey==='movements'||moduleKey==='adjustments'?'Product':'Name',cell:({row})=>{const e=row.original;const label=e.name??e.number??e.product?.name??e.reference??`PAY-${e.id.slice(-6).toUpperCase()}`;return <div className="row">{moduleKey==='contacts'&&<span className="table-avatar">{label[0]}</span>}<div>{c.document||['contacts','products'].includes(moduleKey)?<Link className={`table-link cell-primary ${c.document?'mono':''}`} href={href(e)}>{label}</Link>:<span className="cell-primary">{label}</span>}<span className="subtext">{e.sku??e.email??e.product?.sku??(moduleKey==='payments'?e.allocations?.[0]?.invoice?.number:undefined)}</span></div></div>;}};
-  const columns:LegacyColumnDef<Entity,unknown>[]=[primary];
-  if(c.document)columns.push({id:'party',accessorFn:e=>e.contact?.name??e.vendor?.name??'',header:moduleKey==='pos'?'Vendor':'Customer',cell:({row})=>row.original.contact?.name??row.original.vendor?.name??'—'},{accessorKey:'createdAt',header:'Created',cell:({row})=>date(row.original.createdAt)},{accessorKey:'status',header:'Status',cell:({row})=><Badge status={moduleKey==='pos'&&row.original.status==='PAID'?'RECEIVED':moduleKey==='orders'&&row.original.status==='PAID'?'SHIPPED':row.original.status}/>},{accessorKey:'total',header:'Amount',cell:({row})=><span className="mono">{money(row.original.total,org?.currency)}</span>});
-  else if(moduleKey==='contacts')columns.push({id:'company',accessorFn:e=>e.company?.name??'',header:'Company'},{accessorKey:'title',header:'Role'},{accessorKey:'phone',header:'Phone'});
-  else if(moduleKey==='products')columns.push({accessorKey:'sku',header:'SKU',cell:({row})=><span className="mono">{row.original.sku}</span>},{accessorKey:'unitPrice',header:'Unit price',cell:({row})=><span className="mono">{money(row.original.unitPrice,org?.currency)}</span>},{id:'stock',accessorFn:e=>e.quantity??e.stockLevels?.reduce((n,s)=>n+s.quantity,0)??0,header:'On hand',cell:({row})=>{const e=row.original;const n=e.quantity??e.stockLevels?.reduce((n,s)=>n+s.quantity,0)??0;return <span className="mono">{n} <span className="muted">units</span></span>;}},{id:'availability',header:'Availability',cell:({row})=>{const e=row.original;const n=e.quantity??e.stockLevels?.reduce((n,s)=>n+s.quantity,0)??0;return <Badge status={e.isActive===false?'ARCHIVED':n<=(e.reorderPoint??0)?'LOW':'ACTIVE'}/>;}});
-  else if(['movements','adjustments'].includes(moduleKey))columns.push({id:'warehouse',header:'Warehouse',accessorFn:e=>e.warehouse?.name??'—'},{accessorKey:'type',header:'Type',cell:({row})=><Badge status={row.original.type}/>},{accessorKey:'quantity',header:'Quantity',cell:({row})=><span className={`mono ${(row.original.quantity??0)>0?'positive':'negative'}`}>{(row.original.quantity??0)>0?'+':''}{row.original.quantity}</span>},{accessorKey:'reason',header:'Reason'},{accessorKey:'createdAt',header:'Date',cell:({row})=>date(row.original.createdAt)});
-  else if(moduleKey==='payments')columns.push({accessorKey:'method',header:'Method'},{accessorKey:'paidAt',header:'Payment date',cell:({row})=>date(row.original.paidAt)},{accessorKey:'amount',header:'Amount',cell:({row})=><span className="mono positive">{money(row.original.amount,org?.currency)}</span>});
-  else if(moduleKey==='bills')columns.push({accessorKey:'vendorName',header:'Vendor'},{accessorKey:'dueDate',header:'Due date',cell:({row})=>date(row.original.dueDate)},{accessorKey:'status',header:'Status',cell:({row})=><Badge status={row.original.status}/>},{accessorKey:'total',header:'Amount',cell:({row})=><span className="mono">{money(row.original.total,org?.currency)}</span>},{id:'pay',header:'Action',cell:({row})=>row.original.status!=='PAID'&&user&&canWrite(user.role,['FINANCE'])?<Button onClick={()=>setPay(row.original)}>Record paid</Button>:null});
-  else if(moduleKey==='warehouses')columns.push({accessorKey:'code',header:'Code',cell:({row})=><span className="mono">{row.original.code}</span>});
-  else columns.push({accessorKey:moduleKey==='companies'?'website':'email',header:moduleKey==='companies'?'Website':'Email'},{accessorKey:moduleKey==='companies'?'notes':'phone',header:moduleKey==='companies'?'Notes':'Phone'});
-  if(allowed&&!readonly&&!c.document&&moduleKey!=='adjustments')columns.push({id:'edit',header:'',enableSorting:false,cell:({row})=><Button variant="ghost" aria-label={`Edit ${row.original.name}`} onClick={()=>{setEdit(row.original);setOpen(true);}}><Pencil size={16}/></Button>});
-  async function exportAll(){setExporting(true);try{const n=await exportRecords(endpoint,params);toast.success(n?`Exported ${n} records`:'No records to export');}catch(e){toast.error(errorMessage(e));}finally{setExporting(false);}}
-  return <><div className="page-title spread"><div><h1>{c.title}</h1><p>{c.description}</p></div><div className="row"><Button onClick={exportAll} busy={exporting}><Download size={16}/>Export</Button>{allowed&&!readonly&&<Button variant="primary" onClick={()=>{setEdit(undefined);setOpen(true);}}><Plus size={17}/>New {c.singular}</Button>}</div></div><ModuleTabs moduleKey={moduleKey}/><section className="panel"><div className="toolbar"><div className="row" style={{flex:1}}><div className="filter-search"><Search size={16}/><input value={q} onChange={e=>setQ(e.target.value)} aria-label={`Search ${c.title}`} placeholder={`Search ${c.title.toLowerCase()}…`}/></div>{c.document&&<select aria-label="Filter by status" value={status} onChange={e=>{setStatus(e.target.value);setPage(1);}}><option value="">All statuses</option>{['DRAFT','OPEN','SENT','PARTIAL','PAID','VOID'].map(s=><option key={s} value={s}>{s==='PAID'&&moduleKey==='pos'?'Received':s==='PAID'&&moduleKey==='orders'?'Shipped':s.toLowerCase()}</option>)}</select>}{moduleKey==='products'&&<Button variant={low?'primary':'default'} onClick={()=>{setLow(!low);setPage(1);}}>Low stock</Button>}</div>{moduleKey==='quotes'&&<div className="segmented"><button aria-label="List view" className={!kanban?'active':''} onClick={()=>setKanban(false)}><List size={17}/></button><button aria-label="Board view" className={kanban?'active':''} onClick={()=>setKanban(true)}><Columns3 size={17}/></button></div>}</div>{query.isPending?<Skeleton/>:query.isError?<ErrorState message={errorMessage(query.error)} retry={()=>query.refetch()}/>:!query.data?.data.length?<Empty title={q||status||low?'No matching records':`Your ${c.title.toLowerCase()} start here`} description={q||status||low?'Try changing your search or filters.':'Add your first record and keep everything connected.'}/>:kanban?<div className="kanban panel-body">{[['DRAFT','Draft'],['OPEN','Converted'],['SENT','Sent']].map(([s,label])=><div className="kanban-column" key={s}><h3>{label} <span className="muted">{query.data.data.filter(e=>e.status===s).length}</span></h3>{query.data.data.filter(e=>e.status===s).map(e=><Link className="kanban-card" key={e.id} href={href(e)}><div className="mono">{e.number}</div><p className="muted" style={{margin:'8px 0'}}>{e.contact?.name??'No customer'}</p><strong>{money(e.total,org?.currency)}</strong></Link>)}</div>)}</div>:<DataTable data={query.data.data} columns={columns}/>}<div className="table-footer"><span>{query.data?.meta.total??0} records{kanban?' · Board shows current page':''}</span><div className="row"><span>Page {page} of {Math.max(1,Math.ceil((query.data?.meta.total??0)/20))}</span><Button aria-label="Previous page" disabled={page===1} onClick={()=>setPage(page-1)}><ChevronLeft size={16}/></Button><Button aria-label="Next page" disabled={!query.data||page*20>=query.data.meta.total} onClick={()=>setPage(page+1)}><ChevronRight size={16}/></Button></div></div></section>{open&&(moduleKey==='adjustments'?<Modal open onOpenChange={v=>{if(!v)setOpen(false);}} title="Adjust stock"><StockAdjustment close={()=>setOpen(false)}/></Modal>:<CreateDialog moduleKey={moduleKey} open close={()=>setOpen(false)} record={edit}/>)}<Modal open={!!pay} onOpenChange={v=>{if(!v)setPay(undefined);}} title="Record bill as paid" description="Confirm that you have paid this vendor outside Ledgerflow."><p>{pay?.number} · <strong>{money(pay?.total,org?.currency)}</strong></p><div className="form-actions"><Button onClick={()=>setPay(undefined)}>Cancel</Button><Button variant="primary" busy={paying} onClick={async()=>{if(!pay)return;setPaying(true);try{await api.post(`/bills/${pay.id}/pay`);await cache.invalidateQueries({queryKey:['org',orgId]});toast.success('Bill recorded as paid');setPay(undefined);}catch(e){toast.error(errorMessage(e));}finally{setPaying(false);}}}>Confirm payment</Button></div></Modal></>;
+export function ModuleTabs({ moduleKey }: { moduleKey: string }) {
+  const c = modules[moduleKey];
+  const { user } = useWorkspace();
+  return (
+    <nav className="module-tabs" aria-label="Module navigation">
+      {c.tabs
+        .filter(([, href]) =>
+          canRead(
+            user?.role ?? 'VIEWER',
+            href.endsWith('/orders')
+              ? 'sales-orders'
+              : href.endsWith('/pos')
+                ? 'purchase-orders'
+                : (href.split('/').at(-1) ?? ''),
+          ),
+        )
+        .map(([label, href]) => (
+          <Link className={href.endsWith('/' + moduleKey) ? 'active' : ''} key={href} href={href}>
+            {label}
+          </Link>
+        ))}
+    </nav>
+  );
+}
+export function ListPage({ moduleKey }: { moduleKey: string }) {
+  const c = modules[moduleKey];
+  const searchParams = useSearchParams();
+  const { user, org, orgId } = useWorkspace();
+  const cache = useQueryClient();
+  const [q, setQ] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState('');
+  const [low, setLow] = useState(searchParams.get('low') === 'true');
+  const [open, setOpen] = useState(searchParams.has('new'));
+  const [edit, setEdit] = useState<Entity>();
+  const [exporting, setExporting] = useState(false);
+  const [kanban, setKanban] = useState(false);
+  const [pay, setPay] = useState<Entity>();
+  const [paying, setPaying] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setDebounced(q);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(id);
+  }, [q]);
+  const endpoint = moduleKey === 'products' && low ? 'stock' : c.endpoint;
+  const params = {
+    q: debounced,
+    page,
+    pageSize: 20,
+    ...(status ? { status } : {}),
+    ...(low ? { low: 'true' } : {}),
+  };
+  const query = useList(endpoint, params);
+  const allowed = !!user && canWrite(user.role, c.roles);
+  const readonly = ['payments', 'bills', 'movements'].includes(moduleKey);
+  const href = (e: Entity) =>
+    c.document
+      ? documentHref(c.endpoint, e.id)
+      : `/app/${moduleKey === 'contacts' ? 'crm/contacts' : moduleKey === 'products' ? 'inventory/products' : moduleKey}/${e.id}`;
+  const primary: LegacyColumnDef<Entity, unknown> = {
+    id: 'name',
+    accessorFn: (e) => e.name ?? e.number ?? e.reference ?? e.id,
+    header: c.document
+      ? 'Document'
+      : moduleKey === 'payments'
+        ? 'Payment'
+        : moduleKey === 'movements' || moduleKey === 'adjustments'
+          ? 'Product'
+          : 'Name',
+    cell: ({ row }) => {
+      const e = row.original;
+      const label =
+        e.name ??
+        e.number ??
+        e.product?.name ??
+        e.reference ??
+        `PAY-${e.id.slice(-6).toUpperCase()}`;
+      return (
+        <div className="row">
+          {moduleKey === 'contacts' && <span className="table-avatar">{label[0]}</span>}
+          <div>
+            {c.document || ['contacts', 'products'].includes(moduleKey) ? (
+              <Link
+                className={`table-link cell-primary ${c.document ? 'mono' : ''}`}
+                href={href(e)}
+              >
+                {label}
+              </Link>
+            ) : (
+              <span className="cell-primary">{label}</span>
+            )}
+            <span className="subtext">
+              {e.sku ??
+                e.email ??
+                e.product?.sku ??
+                (moduleKey === 'payments' ? e.allocations?.[0]?.invoice?.number : undefined)}
+            </span>
+          </div>
+        </div>
+      );
+    },
+  };
+  const columns: LegacyColumnDef<Entity, unknown>[] = [primary];
+  if (c.document)
+    columns.push(
+      {
+        id: 'party',
+        accessorFn: (e) => e.contact?.name ?? e.vendor?.name ?? '',
+        header: moduleKey === 'pos' ? 'Vendor' : 'Customer',
+        cell: ({ row }) => row.original.contact?.name ?? row.original.vendor?.name ?? '—',
+      },
+      {
+        accessorKey: 'createdAt',
+        header: 'Created',
+        cell: ({ row }) => date(row.original.createdAt),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <Badge
+            status={
+              moduleKey === 'pos' && row.original.status === 'PAID'
+                ? 'RECEIVED'
+                : moduleKey === 'orders' && row.original.status === 'PAID'
+                  ? 'SHIPPED'
+                  : row.original.status
+            }
+          />
+        ),
+      },
+      {
+        accessorKey: 'total',
+        header: 'Amount',
+        cell: ({ row }) => <span className="mono">{money(row.original.total, org?.currency)}</span>,
+      },
+    );
+  else if (moduleKey === 'contacts')
+    columns.push(
+      { id: 'company', accessorFn: (e) => e.company?.name ?? '', header: 'Company' },
+      { accessorKey: 'title', header: 'Role' },
+      { accessorKey: 'phone', header: 'Phone' },
+    );
+  else if (moduleKey === 'products')
+    columns.push(
+      {
+        accessorKey: 'sku',
+        header: 'SKU',
+        cell: ({ row }) => <span className="mono">{row.original.sku}</span>,
+      },
+      {
+        accessorKey: 'unitPrice',
+        header: 'Unit price',
+        cell: ({ row }) => (
+          <span className="mono">{money(row.original.unitPrice, org?.currency)}</span>
+        ),
+      },
+      {
+        id: 'stock',
+        accessorFn: (e) => e.quantity ?? e.stockLevels?.reduce((n, s) => n + s.quantity, 0) ?? 0,
+        header: 'On hand',
+        cell: ({ row }) => {
+          const e = row.original;
+          const n = e.quantity ?? e.stockLevels?.reduce((n, s) => n + s.quantity, 0) ?? 0;
+          return (
+            <span className="mono">
+              {n} <span className="muted">units</span>
+            </span>
+          );
+        },
+      },
+      {
+        id: 'availability',
+        header: 'Availability',
+        cell: ({ row }) => {
+          const e = row.original;
+          const n = e.quantity ?? e.stockLevels?.reduce((n, s) => n + s.quantity, 0) ?? 0;
+          return (
+            <Badge
+              status={
+                e.isActive === false ? 'ARCHIVED' : n <= (e.reorderPoint ?? 0) ? 'LOW' : 'ACTIVE'
+              }
+            />
+          );
+        },
+      },
+    );
+  else if (['movements', 'adjustments'].includes(moduleKey))
+    columns.push(
+      { id: 'warehouse', header: 'Warehouse', accessorFn: (e) => e.warehouse?.name ?? '—' },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: ({ row }) => <Badge status={row.original.type} />,
+      },
+      {
+        accessorKey: 'quantity',
+        header: 'Quantity',
+        cell: ({ row }) => (
+          <span className={`mono ${(row.original.quantity ?? 0) > 0 ? 'positive' : 'negative'}`}>
+            {(row.original.quantity ?? 0) > 0 ? '+' : ''}
+            {row.original.quantity}
+          </span>
+        ),
+      },
+      { accessorKey: 'reason', header: 'Reason' },
+      { accessorKey: 'createdAt', header: 'Date', cell: ({ row }) => date(row.original.createdAt) },
+    );
+  else if (moduleKey === 'payments')
+    columns.push(
+      { accessorKey: 'method', header: 'Method' },
+      {
+        accessorKey: 'paidAt',
+        header: 'Payment date',
+        cell: ({ row }) => date(row.original.paidAt),
+      },
+      {
+        accessorKey: 'amount',
+        header: 'Amount',
+        cell: ({ row }) => (
+          <span className="mono positive">{money(row.original.amount, org?.currency)}</span>
+        ),
+      },
+    );
+  else if (moduleKey === 'bills')
+    columns.push(
+      { accessorKey: 'vendorName', header: 'Vendor' },
+      { accessorKey: 'dueDate', header: 'Due date', cell: ({ row }) => date(row.original.dueDate) },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => <Badge status={row.original.status} />,
+      },
+      {
+        accessorKey: 'total',
+        header: 'Amount',
+        cell: ({ row }) => <span className="mono">{money(row.original.total, org?.currency)}</span>,
+      },
+      {
+        id: 'pay',
+        header: 'Action',
+        cell: ({ row }) =>
+          row.original.status !== 'PAID' && user && canWrite(user.role, ['FINANCE']) ? (
+            <Button onClick={() => setPay(row.original)}>Record paid</Button>
+          ) : null,
+      },
+    );
+  else if (moduleKey === 'warehouses')
+    columns.push({
+      accessorKey: 'code',
+      header: 'Code',
+      cell: ({ row }) => <span className="mono">{row.original.code}</span>,
+    });
+  else
+    columns.push(
+      {
+        accessorKey: moduleKey === 'companies' ? 'website' : 'email',
+        header: moduleKey === 'companies' ? 'Website' : 'Email',
+      },
+      {
+        accessorKey: moduleKey === 'companies' ? 'notes' : 'phone',
+        header: moduleKey === 'companies' ? 'Notes' : 'Phone',
+      },
+    );
+  if (allowed && !readonly && !c.document && moduleKey !== 'adjustments')
+    columns.push({
+      id: 'edit',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          aria-label={`Edit ${row.original.name}`}
+          onClick={() => {
+            setEdit(row.original);
+            setOpen(true);
+          }}
+        >
+          <Pencil size={16} />
+        </Button>
+      ),
+    });
+  async function exportAll() {
+    setExporting(true);
+    try {
+      const n = await exportRecords(endpoint, params);
+      toast.success(n ? `Exported ${n} records` : 'No records to export');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+  return (
+    <>
+      <div className="page-title spread">
+        <div>
+          <h1>{c.title}</h1>
+          <p>{c.description}</p>
+        </div>
+        <div className="row">
+          <Button onClick={exportAll} busy={exporting}>
+            <Download size={16} />
+            Export
+          </Button>
+          {allowed && !readonly && (
+            <Button
+              variant="primary"
+              onClick={() => {
+                setEdit(undefined);
+                setOpen(true);
+              }}
+            >
+              <Plus size={17} />
+              New {c.singular}
+            </Button>
+          )}
+        </div>
+      </div>
+      <ModuleTabs moduleKey={moduleKey} />
+      <section className="panel">
+        <div className="toolbar">
+          <div className="row" style={{ flex: 1 }}>
+            <div className="filter-search">
+              <Search size={16} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label={`Search ${c.title}`}
+                placeholder={`Search ${c.title.toLowerCase()}…`}
+              />
+            </div>
+            {c.document && (
+              <select
+                aria-label="Filter by status"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All statuses</option>
+                {['DRAFT', 'OPEN', 'SENT', 'PARTIAL', 'PAID', 'VOID'].map((s) => (
+                  <option key={s} value={s}>
+                    {s === 'PAID' && moduleKey === 'pos'
+                      ? 'Received'
+                      : s === 'PAID' && moduleKey === 'orders'
+                        ? 'Shipped'
+                        : s.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            )}
+            {moduleKey === 'products' && (
+              <Button
+                variant={low ? 'primary' : 'default'}
+                onClick={() => {
+                  setLow(!low);
+                  setPage(1);
+                }}
+              >
+                Low stock
+              </Button>
+            )}
+          </div>
+          {moduleKey === 'quotes' && (
+            <div className="segmented">
+              <button
+                aria-label="List view"
+                className={!kanban ? 'active' : ''}
+                onClick={() => setKanban(false)}
+              >
+                <List size={17} />
+              </button>
+              <button
+                aria-label="Board view"
+                className={kanban ? 'active' : ''}
+                onClick={() => setKanban(true)}
+              >
+                <Columns3 size={17} />
+              </button>
+            </div>
+          )}
+        </div>
+        {query.isPending ? (
+          <Skeleton />
+        ) : query.isError ? (
+          <ErrorState message={errorMessage(query.error)} retry={() => query.refetch()} />
+        ) : !query.data?.data.length ? (
+          <Empty
+            title={
+              q || status || low
+                ? 'No matching records'
+                : `Your ${c.title.toLowerCase()} start here`
+            }
+            description={
+              q || status || low
+                ? 'Try changing your search or filters.'
+                : 'Add your first record and keep everything connected.'
+            }
+          />
+        ) : kanban ? (
+          <div className="kanban panel-body">
+            {[
+              ['DRAFT', 'Draft'],
+              ['OPEN', 'Converted'],
+              ['SENT', 'Sent'],
+            ].map(([s, label]) => (
+              <div className="kanban-column" key={s}>
+                <h3>
+                  {label}{' '}
+                  <span className="muted">
+                    {query.data.data.filter((e) => e.status === s).length}
+                  </span>
+                </h3>
+                {query.data.data
+                  .filter((e) => e.status === s)
+                  .map((e) => (
+                    <Link className="kanban-card" key={e.id} href={href(e)}>
+                      <div className="mono">{e.number}</div>
+                      <p className="muted" style={{ margin: '8px 0' }}>
+                        {e.contact?.name ?? 'No customer'}
+                      </p>
+                      <strong>{money(e.total, org?.currency)}</strong>
+                    </Link>
+                  ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <DataTable data={query.data.data} columns={columns} />
+        )}
+        <div className="table-footer">
+          <span>
+            {query.data?.meta.total ?? 0} records{kanban ? ' · Board shows current page' : ''}
+          </span>
+          <div className="row">
+            <span>
+              Page {page} of {Math.max(1, Math.ceil((query.data?.meta.total ?? 0) / 20))}
+            </span>
+            <Button
+              aria-label="Previous page"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+            >
+              <ChevronLeft size={16} />
+            </Button>
+            <Button
+              aria-label="Next page"
+              disabled={!query.data || page * 20 >= query.data.meta.total}
+              onClick={() => setPage(page + 1)}
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        </div>
+      </section>
+      {open &&
+        (moduleKey === 'adjustments' ? (
+          <Modal
+            open
+            onOpenChange={(v) => {
+              if (!v) setOpen(false);
+            }}
+            title="Adjust stock"
+          >
+            <StockAdjustment close={() => setOpen(false)} />
+          </Modal>
+        ) : (
+          <CreateDialog moduleKey={moduleKey} open close={() => setOpen(false)} record={edit} />
+        ))}
+      <Modal
+        open={!!pay}
+        onOpenChange={(v) => {
+          if (!v) setPay(undefined);
+        }}
+        title="Record bill as paid"
+        description="Confirm that you have paid this vendor outside Ledgerflow."
+      >
+        <p>
+          {pay?.number} · <strong>{money(pay?.total, org?.currency)}</strong>
+        </p>
+        <div className="form-actions">
+          <Button onClick={() => setPay(undefined)}>Cancel</Button>
+          <Button
+            variant="primary"
+            busy={paying}
+            onClick={async () => {
+              if (!pay) return;
+              setPaying(true);
+              try {
+                await api.post(`/bills/${pay.id}/pay`);
+                await cache.invalidateQueries({ queryKey: ['org', orgId] });
+                toast.success('Bill recorded as paid');
+                setPay(undefined);
+              } catch (e) {
+                toast.error(errorMessage(e));
+              } finally {
+                setPaying(false);
+              }
+            }}
+          >
+            Confirm payment
+          </Button>
+        </div>
+      </Modal>
+    </>
+  );
 }

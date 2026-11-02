@@ -3,27 +3,339 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery,useQueryClient } from '@tanstack/react-query';
-import { useDispatch,useSelector } from 'react-redux';
-import { Sun,Moon,Plus,Copy,Check,UserRoundPlus } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useDispatch, useSelector } from 'react-redux';
+import { Sun, Moon, Plus, Copy, Check, UserRoundPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { api,errorMessage,date } from '@/lib/api';
-import { useWorkspace,useList } from '@/hooks/use-workspace';
+import { api, errorMessage, date } from '@/lib/api';
+import { useWorkspace, useList } from '@/hooks/use-workspace';
 import { canWrite } from '@/lib/modules';
-import { preferences,session,type Dispatch,type RootState } from '@/store';
+import { preferences, session, type Dispatch, type RootState } from '@/store';
 import type { Me } from '@/lib/types';
-import { Button,Modal,ErrorState,Skeleton } from './ui';
+import { Button, Modal, ErrorState, Skeleton } from './ui';
 import { MasterForm } from './record-form';
-import { AdminSettings,MemberControls } from './admin-settings';
+import { AdminSettings, MemberControls } from './admin-settings';
 import { ActivityFeed } from './dashboard';
-const orgSchema=z.object({name:z.string().trim().min(2).max(120),currency:z.string().regex(/^[A-Z]{3}$/),timezone:z.string().min(2).max(80)});
-const inviteSchema=z.object({email:z.email(),role:z.enum(['ADMIN','SALES','INVENTORY','FINANCE','VIEWER'])});
-type Member={id:string;role:string;user:{name:string;email:string}};
-function InviteForm(){const [url,setUrl]=useState('');const [error,setError]=useState('');const {register,handleSubmit,formState:{isSubmitting}}=useForm<z.infer<typeof inviteSchema>>({resolver:zodResolver(inviteSchema),defaultValues:{role:'VIEWER'}});return url?<div className="stack"><div className="row positive"><Check size={20}/>Invitation created</div><p className="muted">Share this link with your teammate. It expires in 7 days. Invitations are shared manually.</p><input readOnly value={url} aria-label="Invitation link" onFocus={e=>e.target.select()}/><Button onClick={async()=>{try{await navigator.clipboard.writeText(url);toast.success('Invitation copied');}catch{toast.error('Select and copy the invitation link');}}}><Copy size={16}/>Copy invitation</Button></div>:<form className="stack" onSubmit={handleSubmit(async v=>{try{const r=await api.post<{url:string}>('/orgs/current/members',v);setUrl(r.data.url);}catch(e){setError(errorMessage(e));}})}>{error&&<p className="form-alert" role="alert">{error}</p>}<label>Email<input required type="email" {...register('email')}/></label><label>Workspace role<select {...register('role')}>{['VIEWER','SALES','INVENTORY','FINANCE','ADMIN'].map(r=><option key={r} value={r}>{r.toLowerCase()}</option>)}</select></label><p className="muted">Sales manages CRM and sales. Inventory manages stock and purchasing. Finance manages invoices and payments. Viewers can read records.</p><Button variant="primary" busy={isSubmitting} type="submit">Create invitation link</Button></form>;}
-export function Settings(){
-  const {user,org,orgId}=useWorkspace();const dispatch=useDispatch<Dispatch>();const cache=useQueryClient();const ui=useSelector((s:RootState)=>s.ui);const [invite,setInvite]=useState(false);const [tax,setTax]=useState(false);const [error,setError]=useState('');const admin=!!user&&canWrite(user.role,[]);
-  const members=useQuery({queryKey:['org',orgId,'members'],queryFn:()=>api.get<Member[]>('/orgs/current/members').then(r=>r.data),enabled:!!orgId&&admin});const taxes=useList('tax-rates');const activity=useList('audit-logs',{pageSize:20},admin);
-  const {register,handleSubmit,formState:{isSubmitting,errors}}=useForm<z.infer<typeof orgSchema>>({resolver:zodResolver(orgSchema),defaultValues:{name:org?.name??'',currency:org?.currency??'USD',timezone:org?.timezone??'UTC'}});
-  async function save(v:z.infer<typeof orgSchema>){setError('');try{await api.patch('/orgs/current',v);const me=await api.get<Me>('/me');dispatch(session(me.data));await cache.invalidateQueries({queryKey:['org',orgId]});toast.success('Workspace updated');}catch(e){setError(errorMessage(e));}}
-  return <><div className="page-title"><h1>Workspace settings</h1><p>A workspace that works the way you do.</p></div><div className="settings-grid"><div className="stack"><section className="panel"><div className="panel-heading"><h2>Organization profile</h2><p className="muted">The details behind your documents.</p></div><form className="settings-form stack" onSubmit={handleSubmit(save)}>{error&&<div className="form-alert" role="alert">{error}</div>}<label>Organization name<input disabled={!admin} {...register('name')}/>{errors.name&&<span className="field-error">{errors.name.message}</span>}</label><div className="form-grid"><label>Currency<input disabled={!admin} maxLength={3} {...register('currency')}/><span className="muted">Single currency per workspace</span></label><label>Timezone<input disabled={!admin} {...register('timezone')} placeholder="Asia/Dhaka"/></label></div>{admin&&<Button type="submit" variant="primary" busy={isSubmitting} style={{justifySelf:'start'}}>Save changes</Button>}</form></section>{admin&&<section className="panel"><div className="panel-heading spread"><div><h2>Members & access</h2><p className="muted">The right tools for the right people.</p></div><Button onClick={()=>setInvite(true)}><UserRoundPlus size={16}/>Invite</Button></div>{members.isPending?<Skeleton rows={2}/>:members.isError?<ErrorState message={errorMessage(members.error)} retry={()=>members.refetch()}/>:<div className="panel-body stack">{members.data?.map(m=><div className="spread" key={m.id}><div className="row"><span className="avatar">{m.user.name[0]}</span><div>{m.user.name}<p className="muted">{m.user.email}</p></div></div><MemberControls member={m}/></div>)}</div>}</section>}<section className="panel"><div className="panel-heading spread"><h2>Tax rates</h2>{admin&&<Button onClick={()=>setTax(true)}><Plus size={16}/>Add tax</Button>}</div><div className="panel-body stack">{taxes.data?.data.map(t=><div className="spread" key={t.id}><span>{t.name}</span><span className="mono">{(t.rateBps??0)/100}%</span></div>)}</div></section>{admin&&<AdminSettings/>}</div><div className="stack"><section className="panel"><div className="panel-heading"><h2>Make yourself at home</h2><p className="muted">Preferences are saved on this device.</p></div><div className="panel-body"><div className="settings-row"><div className="spread"><div><h3>Appearance</h3><p className="muted">Set the right mood.</p></div><div className="segmented">{['light','dark'].map(t=><button key={t} aria-label={`${t} theme`} className={ui.theme===t?'active':''} onClick={()=>dispatch(preferences({theme:t}))}>{t==='light'?<Sun size={17}/>:<Moon size={17}/>}</button>)}</div></div></div><div className="settings-row"><h3>Table density</h3><p className="muted" style={{margin:'4px 0 14px'}}>More breathing room, or more in view.</p><div className="segmented">{['comfortable','compact'].map(t=><button key={t} className={ui.density===t?'active':''} onClick={()=>dispatch(preferences({density:t}))} style={{textTransform:'capitalize'}}>{t}</button>)}</div><p className="muted" style={{marginTop:12}}>Text stays at least 14px in both modes.</p></div><div className="settings-row"><h3>Keyboard shortcuts</h3><div className="spread" style={{marginTop:12}}><span className="muted">Open command palette</span><span><kbd>⌘ K</kbd> / <kbd>/</kbd></span></div><div className="spread" style={{marginTop:10}}><span className="muted">Close dialog</span><kbd>esc</kbd></div></div></div></section>{admin&&<section className="panel"><div className="panel-heading"><h2>Audit history</h2><p className="muted">An accountable workspace, by default.</p></div><div className="panel-body"><ActivityFeed items={activity.data?.data??[]}/></div></section>}<p className="muted">Ledgerflow · Workspace created for your team.<br/>Today: {date(new Date().toISOString())}</p></div></div><Modal open={invite} onOpenChange={setInvite} title="Invite a teammate" description="Give your team a shared place to work.">{invite&&<InviteForm/>}</Modal><Modal open={tax} onOpenChange={setTax} title="Add tax rate">{tax&&<MasterForm resource="tax-rates" close={()=>setTax(false)}/>}</Modal></>;
+const orgSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  timezone: z.string().min(2).max(80),
+});
+const inviteSchema = z.object({
+  email: z.email(),
+  role: z.enum(['ADMIN', 'SALES', 'INVENTORY', 'FINANCE', 'VIEWER']),
+});
+type Member = { id: string; role: string; user: { name: string; email: string } };
+function InviteForm() {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting },
+  } = useForm<z.infer<typeof inviteSchema>>({
+    resolver: zodResolver(inviteSchema),
+    defaultValues: { role: 'VIEWER' },
+  });
+  return url ? (
+    <div className="stack">
+      <div className="row positive">
+        <Check size={20} />
+        Invitation created
+      </div>
+      <p className="muted">
+        Share this link with your teammate. It expires in 7 days. Invitations are shared manually.
+      </p>
+      <input readOnly value={url} aria-label="Invitation link" onFocus={(e) => e.target.select()} />
+      <Button
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            toast.success('Invitation copied');
+          } catch {
+            toast.error('Select and copy the invitation link');
+          }
+        }}
+      >
+        <Copy size={16} />
+        Copy invitation
+      </Button>
+    </div>
+  ) : (
+    <form
+      className="stack"
+      onSubmit={handleSubmit(async (v) => {
+        try {
+          const r = await api.post<{ url: string }>('/orgs/current/members', v);
+          setUrl(r.data.url);
+        } catch (e) {
+          setError(errorMessage(e));
+        }
+      })}
+    >
+      {error && (
+        <p className="form-alert" role="alert">
+          {error}
+        </p>
+      )}
+      <label>
+        Email
+        <input required type="email" {...register('email')} />
+      </label>
+      <label>
+        Workspace role
+        <select {...register('role')}>
+          {['VIEWER', 'SALES', 'INVENTORY', 'FINANCE', 'ADMIN'].map((r) => (
+            <option key={r} value={r}>
+              {r.toLowerCase()}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted">
+        Sales manages CRM and sales. Inventory manages stock and purchasing. Finance manages
+        invoices and payments. Viewers can read records.
+      </p>
+      <Button variant="primary" busy={isSubmitting} type="submit">
+        Create invitation link
+      </Button>
+    </form>
+  );
+}
+export function Settings() {
+  const { user, org, orgId } = useWorkspace();
+  const dispatch = useDispatch<Dispatch>();
+  const cache = useQueryClient();
+  const ui = useSelector((s: RootState) => s.ui);
+  const [invite, setInvite] = useState(false);
+  const [tax, setTax] = useState(false);
+  const [error, setError] = useState('');
+  const admin = !!user && canWrite(user.role, []);
+  const members = useQuery({
+    queryKey: ['org', orgId, 'members'],
+    queryFn: () => api.get<Member[]>('/orgs/current/members').then((r) => r.data),
+    enabled: !!orgId && admin,
+  });
+  const taxes = useList('tax-rates');
+  const activity = useList('audit-logs', { pageSize: 20 }, admin);
+  const {
+    register,
+    handleSubmit,
+    formState: { isSubmitting, errors },
+  } = useForm<z.infer<typeof orgSchema>>({
+    resolver: zodResolver(orgSchema),
+    defaultValues: {
+      name: org?.name ?? '',
+      currency: org?.currency ?? 'USD',
+      timezone: org?.timezone ?? 'UTC',
+    },
+  });
+  async function save(v: z.infer<typeof orgSchema>) {
+    setError('');
+    try {
+      await api.patch('/orgs/current', v);
+      const me = await api.get<Me>('/me');
+      dispatch(session(me.data));
+      await cache.invalidateQueries({ queryKey: ['org', orgId] });
+      toast.success('Workspace updated');
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+  return (
+    <>
+      <div className="page-title">
+        <h1>Workspace settings</h1>
+        <p>A workspace that works the way you do.</p>
+      </div>
+      <div className="settings-grid">
+        <div className="stack">
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Organization profile</h2>
+              <p className="muted">The details behind your documents.</p>
+            </div>
+            <form className="settings-form stack" onSubmit={handleSubmit(save)}>
+              {error && (
+                <div className="form-alert" role="alert">
+                  {error}
+                </div>
+              )}
+              <label>
+                Organization name
+                <input disabled={!admin} {...register('name')} />
+                {errors.name && <span className="field-error">{errors.name.message}</span>}
+              </label>
+              <div className="form-grid">
+                <label>
+                  Currency
+                  <input disabled={!admin} maxLength={3} {...register('currency')} />
+                  <span className="muted">Single currency per workspace</span>
+                </label>
+                <label>
+                  Timezone
+                  <input disabled={!admin} {...register('timezone')} placeholder="Asia/Dhaka" />
+                </label>
+              </div>
+              {admin && (
+                <Button
+                  type="submit"
+                  variant="primary"
+                  busy={isSubmitting}
+                  style={{ justifySelf: 'start' }}
+                >
+                  Save changes
+                </Button>
+              )}
+            </form>
+          </section>
+          {admin && (
+            <section className="panel">
+              <div className="panel-heading spread">
+                <div>
+                  <h2>Members & access</h2>
+                  <p className="muted">The right tools for the right people.</p>
+                </div>
+                <Button onClick={() => setInvite(true)}>
+                  <UserRoundPlus size={16} />
+                  Invite
+                </Button>
+              </div>
+              {members.isPending ? (
+                <Skeleton rows={2} />
+              ) : members.isError ? (
+                <ErrorState message={errorMessage(members.error)} retry={() => members.refetch()} />
+              ) : (
+                <div className="panel-body stack">
+                  {members.data?.map((m) => (
+                    <div className="spread" key={m.id}>
+                      <div className="row">
+                        <span className="avatar">{m.user.name[0]}</span>
+                        <div>
+                          {m.user.name}
+                          <p className="muted">{m.user.email}</p>
+                        </div>
+                      </div>
+                      <MemberControls member={m} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+          <section className="panel">
+            <div className="panel-heading spread">
+              <h2>Tax rates</h2>
+              {admin && (
+                <Button onClick={() => setTax(true)}>
+                  <Plus size={16} />
+                  Add tax
+                </Button>
+              )}
+            </div>
+            <div className="panel-body stack">
+              {taxes.data?.data.map((t) => (
+                <div className="spread" key={t.id}>
+                  <span>{t.name}</span>
+                  <span className="mono">{(t.rateBps ?? 0) / 100}%</span>
+                </div>
+              ))}
+            </div>
+          </section>
+          {admin && <AdminSettings />}
+        </div>
+        <div className="stack">
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>Make yourself at home</h2>
+              <p className="muted">Preferences are saved on this device.</p>
+            </div>
+            <div className="panel-body">
+              <div className="settings-row">
+                <div className="spread">
+                  <div>
+                    <h3>Appearance</h3>
+                    <p className="muted">Set the right mood.</p>
+                  </div>
+                  <div className="segmented">
+                    {['light', 'dark'].map((t) => (
+                      <button
+                        key={t}
+                        aria-label={`${t} theme`}
+                        className={ui.theme === t ? 'active' : ''}
+                        onClick={() => dispatch(preferences({ theme: t }))}
+                      >
+                        {t === 'light' ? <Sun size={17} /> : <Moon size={17} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="settings-row">
+                <h3>Table density</h3>
+                <p className="muted" style={{ margin: '4px 0 14px' }}>
+                  More breathing room, or more in view.
+                </p>
+                <div className="segmented">
+                  {['comfortable', 'compact'].map((t) => (
+                    <button
+                      key={t}
+                      className={ui.density === t ? 'active' : ''}
+                      onClick={() => dispatch(preferences({ density: t }))}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted" style={{ marginTop: 12 }}>
+                  Text stays at least 14px in both modes.
+                </p>
+              </div>
+              <div className="settings-row">
+                <h3>Keyboard shortcuts</h3>
+                <div className="spread" style={{ marginTop: 12 }}>
+                  <span className="muted">Open command palette</span>
+                  <span>
+                    <kbd>⌘ K</kbd> / <kbd>/</kbd>
+                  </span>
+                </div>
+                <div className="spread" style={{ marginTop: 10 }}>
+                  <span className="muted">Close dialog</span>
+                  <kbd>esc</kbd>
+                </div>
+              </div>
+            </div>
+          </section>
+          {admin && (
+            <section className="panel">
+              <div className="panel-heading">
+                <h2>Audit history</h2>
+                <p className="muted">An accountable workspace, by default.</p>
+              </div>
+              <div className="panel-body">
+                <ActivityFeed items={activity.data?.data ?? []} />
+              </div>
+            </section>
+          )}
+          <p className="muted">
+            Ledgerflow · Workspace created for your team.
+            <br />
+            Today: {date(new Date().toISOString())}
+          </p>
+        </div>
+      </div>
+      <Modal
+        open={invite}
+        onOpenChange={setInvite}
+        title="Invite a teammate"
+        description="Give your team a shared place to work."
+      >
+        {invite && <InviteForm />}
+      </Modal>
+      <Modal open={tax} onOpenChange={setTax} title="Add tax rate">
+        {tax && <MasterForm resource="tax-rates" close={() => setTax(false)} />}
+      </Modal>
+    </>
+  );
 }

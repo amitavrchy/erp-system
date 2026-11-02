@@ -14,9 +14,19 @@ import { ErpController } from './erp/erp.controller.js';
 import { HealthController } from './health.controller.js';
 
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, JwtModule.register({})],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    JwtModule.register({}),
+  ],
   controllers: [AppController, AuthController, ErpController, HealthController],
-  providers: [AppService, AuthService, AuthGuard, CatalogService, WorkflowsService, ReportsService],
+  providers: [
+    AppService,
+    AuthService,
+    AuthGuard,
+    CatalogService,
+    WorkflowsService,
+    ReportsService,
+  ],
 })
 export class AppModule {}
-
