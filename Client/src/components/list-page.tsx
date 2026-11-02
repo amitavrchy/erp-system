@@ -24,6 +24,7 @@ import { DataTable } from './data-table';
 import { Button, Badge, Empty, Skeleton, ErrorState, Modal } from './ui';
 import { CreateDialog } from './record-form';
 import { StockAdjustment } from './stock-adjustment';
+import { useCrmMeta } from '@/hooks/use-crm';
 
 export function ModuleTabs({ moduleKey }: { moduleKey: string }) {
   const c = modules[moduleKey];
@@ -65,6 +66,10 @@ export function ListPage({ moduleKey }: { moduleKey: string }) {
   const [kanban, setKanban] = useState(false);
   const [pay, setPay] = useState<Entity>();
   const [paying, setPaying] = useState(false);
+  const crm = useCrmMeta(moduleKey === 'contacts');
+  const [lifecycle, setLifecycle] = useState('');
+  const [contactOwner, setContactOwner] = useState('');
+  const [tag, setTag] = useState('');
   useEffect(() => {
     const id = setTimeout(() => {
       setDebounced(q);
@@ -79,6 +84,13 @@ export function ListPage({ moduleKey }: { moduleKey: string }) {
     pageSize: 20,
     ...(status ? { status } : {}),
     ...(low ? { low: 'true' } : {}),
+    ...(moduleKey === 'contacts'
+      ? {
+          ...(lifecycle ? { lifecycle } : {}),
+          ...(contactOwner ? { ownerId: contactOwner } : {}),
+          ...(tag ? { tag } : {}),
+        }
+      : {}),
   };
   const query = useList(endpoint, params);
   const allowed = !!user && canWrite(user.role, c.roles);
@@ -170,6 +182,16 @@ export function ListPage({ moduleKey }: { moduleKey: string }) {
       { id: 'company', accessorFn: (e) => e.company?.name ?? '', header: 'Company' },
       { accessorKey: 'title', header: 'Role' },
       { accessorKey: 'phone', header: 'Phone' },
+      {
+        accessorKey: 'lifecycle',
+        header: 'Lifecycle',
+        cell: ({ row }) => <Badge status={row.original.lifecycle ?? 'CUSTOMER'} />,
+      },
+      {
+        id: 'owner',
+        header: 'Owner',
+        accessorFn: (e) => crm.data?.members.find((m) => m.id === e.ownerId)?.name ?? 'Unassigned',
+      },
     );
   else if (moduleKey === 'products')
     columns.push(
@@ -350,7 +372,7 @@ export function ListPage({ moduleKey }: { moduleKey: string }) {
       <ModuleTabs moduleKey={moduleKey} />
       <section className="panel">
         <div className="toolbar">
-          <div className="row" style={{ flex: 1 }}>
+          <div className={moduleKey === 'contacts' ? 'crm-filters' : 'row'} style={{ flex: 1 }}>
             <div className="filter-search">
               <Search size={16} />
               <input
@@ -360,6 +382,51 @@ export function ListPage({ moduleKey }: { moduleKey: string }) {
                 placeholder={`Search ${c.title.toLowerCase()}…`}
               />
             </div>
+            {moduleKey === 'contacts' && (
+              <>
+                <select
+                  aria-label="Lifecycle filter"
+                  value={lifecycle}
+                  onChange={(e) => {
+                    setLifecycle(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">All lifecycles</option>
+                  {['LEAD', 'PROSPECT', 'CUSTOMER', 'PARTNER', 'INACTIVE'].map((s) => (
+                    <option key={s} value={s}>
+                      {s.toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Contact owner filter"
+                  value={contactOwner}
+                  onChange={(e) => {
+                    setContactOwner(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">All owners</option>
+                  <option value="me">Assigned to me</option>
+                  {crm.data?.members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label="Filter by tag"
+                  placeholder="Has tag…"
+                  style={{ maxWidth: 160 }}
+                  value={tag}
+                  onChange={(e) => {
+                    setTag(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </>
+            )}
             {c.document && (
               <select
                 aria-label="Filter by status"

@@ -13,6 +13,8 @@ import { CreateDialog } from './record-form';
 import { ContactTimeline } from './contact-timeline';
 import { StockAdjustment } from './stock-adjustment';
 import { useRouter } from 'next/navigation';
+import { useCrmMeta } from '@/hooks/use-crm';
+import { humanize } from '@/lib/crm';
 
 export function MasterDetail({ moduleKey, id }: { moduleKey: string; id: string }) {
   const c = modules[moduleKey];
@@ -24,6 +26,7 @@ export function MasterDetail({ moduleKey, id }: { moduleKey: string; id: string 
   const [remove, setRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const product = moduleKey === 'products';
+  const crm = useCrmMeta(!product);
   const query = useQuery({
     queryKey: ['org', orgId, c.endpoint, id],
     queryFn: () =>
@@ -198,6 +201,38 @@ export function MasterDetail({ moduleKey, id }: { moduleKey: string; id: string 
                 </div>
               )}
               <p className="muted">Added {date(d.createdAt)}</p>
+              <div className="spread">
+                <span className="muted">Lifecycle</span>
+                <Badge status={d.lifecycle ?? 'CUSTOMER'} />
+              </div>
+              <div className="spread">
+                <span className="muted">Source</span>
+                <span>{humanize(d.source ?? 'MANUAL')}</span>
+              </div>
+              <div className="spread">
+                <span className="muted">Owner</span>
+                <span>
+                  {crm.data?.members.find((m) => m.id === d.ownerId)?.name ?? 'Unassigned'}
+                </span>
+              </div>
+              {d.tags?.length ? (
+                <div className="row" style={{ flexWrap: 'wrap' }}>
+                  {d.tags.map((t) => (
+                    <span className="badge" key={t}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {Object.entries(d.customFields ?? {}).map(([key, value]) => (
+                <div className="spread" key={key}>
+                  <span className="muted">
+                    {crm.data?.fields.find((f) => f.key === key && f.entity === 'contacts')?.name ??
+                      key}
+                  </span>
+                  <span>{String(value ?? '—')}</span>
+                </div>
+              ))}
             </>
           )}
           {allowed && (

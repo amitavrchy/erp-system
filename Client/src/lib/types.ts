@@ -23,6 +23,10 @@ export interface Line {
   quantityReceived?: number;
 }
 export interface Entity {
+  lifecycle?: string;
+  source?: string;
+  ownerId?: string;
+  customFields?: Record<string, string | number | null>;
   id: string;
   name?: string;
   number?: string;

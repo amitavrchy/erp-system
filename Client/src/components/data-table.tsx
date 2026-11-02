@@ -8,13 +8,12 @@ import {
   type LegacyColumnDef,
 } from '@tanstack/react-table/legacy';
 import { ArrowUpDown } from 'lucide-react';
-import type { Entity } from '@/lib/types';
-export function DataTable({
+export function DataTable<TData extends object>({
   data,
   columns,
 }: {
-  data: Entity[];
-  columns: LegacyColumnDef<Entity, unknown>[];
+  data: TData[];
+  columns: LegacyColumnDef<TData, unknown>[];
 }) {
   const [sorting, setSorting] = useState<{ id: string; desc: boolean }[]>([]);
   const table = useLegacyTable({

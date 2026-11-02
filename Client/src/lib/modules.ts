@@ -11,7 +11,7 @@ import {
 import type { Role } from './types';
 export const navigation = [
   { label: 'Overview', href: '/app', Icon: LayoutDashboard },
-  { label: 'CRM', href: '/app/crm/contacts', Icon: Users },
+  { label: 'CRM', href: '/app/crm/overview', Icon: Users },
   { label: 'Sales', href: '/app/sales/quotes', Icon: ShoppingBag },
   { label: 'Inventory', href: '/app/inventory/products', Icon: Package },
   { label: 'Purchasing', href: '/app/purchasing/pos', Icon: Truck },

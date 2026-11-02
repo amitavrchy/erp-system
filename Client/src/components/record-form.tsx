@@ -12,6 +12,8 @@ import { modules, documentHref } from '@/lib/modules';
 import type { Entity } from '@/lib/types';
 import { useList, useWorkspace } from '@/hooks/use-workspace';
 import { Button, Modal } from './ui';
+import { useCrmMeta } from '@/hooks/use-crm';
+import { CustomInputs } from './crm/crm-form';
 
 type Field = {
   key: string;
@@ -20,6 +22,7 @@ type Field = {
   required?: boolean;
   min?: number;
   max?: number;
+  options?: string[];
 };
 const fields: Record<string, Field[]> = {
   contacts: [
@@ -29,6 +32,14 @@ const fields: Record<string, Field[]> = {
     { key: 'title', label: 'Job title' },
     { key: 'companyId', label: 'Company', type: 'company' },
     { key: 'tags', label: 'Tags (comma separated)' },
+    {
+      key: 'lifecycle',
+      label: 'Lifecycle',
+      type: 'select',
+      options: ['CUSTOMER', 'PROSPECT', 'LEAD', 'PARTNER', 'INACTIVE'],
+    },
+    { key: 'source', label: 'Acquisition source' },
+    { key: 'ownerId', label: 'Relationship owner', type: 'owner' },
   ],
   companies: [
     { key: 'name', label: 'Company name', required: true },
@@ -86,6 +97,13 @@ export function MasterForm({
   const { orgId } = useWorkspace();
   const [error, setError] = useState('');
   const companies = useList('companies', { pageSize: 100 }, resource === 'contacts');
+  const crm = useCrmMeta(resource === 'contacts');
+  const custom = crm.data?.fields.filter((f) => f.entity === 'contacts') ?? [];
+  const [customValues, setCustomValues] = useState<Record<string, string>>(
+    Object.fromEntries(
+      Object.entries(record?.customFields ?? {}).map(([k, v]) => [k, String(v ?? '')]),
+    ),
+  );
   const {
     register,
     handleSubmit,
@@ -132,11 +150,21 @@ export function MasterForm({
       Object.entries(parsed.data).filter(([, v]) => v !== ''),
     );
     if (resource === 'contacts') {
+      if (custom.length)
+        body.customFields = Object.fromEntries(
+          custom.map((f) => [
+            f.key,
+            f.type === 'NUMBER' && customValues[f.key]
+              ? Number(customValues[f.key])
+              : (customValues[f.key] ?? ''),
+          ]),
+        );
       body.tags = (values.tags ?? '')
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean);
       if (record && values.companyId === '') body.companyId = '';
+      if (record && values.ownerId === '') body.ownerId = '';
     }
     if (resource === 'products' && values.attrsJson) {
       try {
@@ -176,6 +204,23 @@ export function MasterForm({
                   </option>
                 ))}
               </select>
+            ) : f.type === 'select' ? (
+              <select {...register(f.key)}>
+                {f.options?.map((o) => (
+                  <option key={o} value={o}>
+                    {o.toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            ) : f.type === 'owner' ? (
+              <select {...register(f.key)}>
+                <option value="">Unassigned</option>
+                {crm.data?.members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
             ) : f.type === 'textarea' ? (
               <textarea {...register(f.key)} />
             ) : (
@@ -191,6 +236,7 @@ export function MasterForm({
             )}
           </label>
         ))}
+        <CustomInputs fields={custom} values={customValues} setValues={setCustomValues} />
       </div>
       <div className="form-actions">
         <Button type="button" onClick={close}>
