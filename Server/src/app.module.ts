@@ -7,11 +7,15 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
+import { CatalogService } from './erp/catalog.service.js';
+import { WorkflowsService } from './erp/workflows.service.js';
+import { ReportsService } from './erp/reports.service.js';
+import { ErpController } from './erp/erp.controller.js';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true }), PrismaModule, JwtModule.register({})],
-  controllers: [AppController, AuthController],
-  providers: [AppService, AuthService, AuthGuard],
+  controllers: [AppController, AuthController, ErpController],
+  providers: [AppService, AuthService, AuthGuard, CatalogService, WorkflowsService, ReportsService],
 })
 export class AppModule {}
 

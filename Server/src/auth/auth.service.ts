@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { hash, compare } from 'bcrypt';
 import { randomBytes, createHash } from 'node:crypto';
-import type { LoginDto, RegisterDto } from './auth.dto.js';
+import type { LoginDto, RegisterDto, AcceptInviteDto } from './auth.dto.js';
 
 const digest = (token: string) => createHash('sha256').update(token).digest('hex');
 @Injectable()
@@ -55,5 +55,22 @@ export class AuthService {
   async logout(token?: string) {
     if (token) await this.db.refreshSession.deleteMany({ where: { tokenHash: digest(token) } });
     return { ok: true };
+  }
+
+  async accept(dto: AcceptInviteDto) {
+    const invite = await this.db.invitation.findUnique({ where: { tokenHash: digest(dto.token) } });
+    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) throw new UnauthorizedException('Invitation is invalid or expired');
+    const existing = await this.db.user.findUnique({ where: { email: invite.email } });
+    if (existing && !(await compare(dto.password, existing.passwordHash))) throw new UnauthorizedException('Use your existing account password');
+    const passwordHash = existing?.passwordHash ?? await hash(dto.password, 12);
+    const userId = await this.db.$transaction(async tx => {
+      const claimed = await tx.invitation.updateMany({ where: { id: invite.id, acceptedAt: null }, data: { acceptedAt: new Date() } });
+      if (!claimed.count) throw new UnauthorizedException('Invitation has already been accepted');
+      const user = existing ?? await tx.user.create({ data: { email: invite.email, name: dto.name, passwordHash } });
+      await tx.membership.upsert({ where: { organizationId_userId: { organizationId: invite.organizationId, userId: user.id } }, create: { userId: user.id, organizationId: invite.organizationId, role: invite.role }, update: {} });
+      await tx.auditLog.create({ data: { organizationId: invite.organizationId, userId: user.id, action: 'joined workspace', entityType: 'members', entityId: user.id } });
+      return user.id;
+    }, { isolationLevel: 'Serializable' });
+    return this.tokens(userId, invite.organizationId);
   }
 }

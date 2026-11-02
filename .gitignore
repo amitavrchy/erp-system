@@ -10,3 +10,7 @@ __pycache__/
 *.log
 .DS_Store
 !**/.env.example
+
+*.tsbuildinfo
+playwright-report/
+test-results/

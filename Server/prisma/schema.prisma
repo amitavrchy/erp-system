@@ -214,6 +214,7 @@ model StockMovement {
 }
 
 model Quote {
+  createdById    String?
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -248,6 +249,7 @@ model QuoteLine {
 }
 
 model SalesOrder {
+  createdById    String?
   id             String           @id @default(cuid())
   organizationId String
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -281,6 +283,7 @@ model SalesOrderLine {
 }
 
 model Invoice {
+  createdById    String?
   id             String              @id @default(cuid())
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -401,4 +404,33 @@ model RefreshSession {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Invitation {
+  id             String         @id @default(cuid())
+  organizationId String
+  email          String
+  role           MembershipRole
+  tokenHash      String         @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@index([organizationId])
+}
+
+model Bill {
+  id              String    @id @default(cuid())
+  organizationId  String
+  purchaseOrderId String    @unique
+  number          String
+  vendorName      String
+  total           Decimal   @db.Decimal(14, 2)
+  amountPaid      Decimal   @default(0) @db.Decimal(14, 2)
+  status          DocStatus @default(OPEN)
+  dueDate         DateTime
+  createdAt       DateTime  @default(now())
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
 }

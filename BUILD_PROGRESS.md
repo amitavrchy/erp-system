@@ -1,11 +1,11 @@
 # Ledgerflow build
 
-The implementation follows PROJECT_SPEC.md. The explicit user requirement overrides
+The implementation follows docs/PROJECT_SPEC.md. The explicit user requirement overrides
 the spec's dense typography: all text is at least 14px.
 
 ## Milestones
 
-- [ ] Database schema, migrations and secure authentication
+- [x] Database schema, migrations and secure authentication
 - [ ] Tenant-scoped CRM and catalog, roles and audit
 - [ ] Transactional sales, payments and stock workflows
 - [ ] Responsive application shell and accessible design system

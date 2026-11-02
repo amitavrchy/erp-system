@@ -2,7 +2,7 @@ import { Body, Controller, Post, Req, Res, UseGuards, Get, HttpCode } from '@nes
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
-import { LoginDto, RegisterDto } from './auth.dto.js';
+import { LoginDto, RegisterDto, AcceptInviteDto } from './auth.dto.js';
 import { AuthGuard, type AuthRequest } from './auth.guard.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
@@ -27,6 +27,15 @@ export class AuthController {
   @Post('auth/logout') @HttpCode(200) logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     res.clearCookie('lf_refresh', { path: '/auth' });
     return this.auth.logout(cookie(req));
+  }
+  @Post('auth/accept-invite') accept(@Body() dto: AcceptInviteDto, @Res({ passthrough: true }) res: Response) {
+    return this.auth.accept(dto).then(t => this.respond(res, t));
+  }
+  @Post('auth/switch/:orgId') @UseGuards(AuthGuard) async switchOrg(@Req() req: AuthRequest, @Res({ passthrough: true }) res: Response) {
+    const member = await this.db.membership.findUnique({ where: { organizationId_userId: { organizationId: req.params.orgId as string, userId: req.actor.userId } } });
+    if (!member) throw new (await import('@nestjs/common')).ForbiddenException();
+    await this.auth.logout(cookie(req));
+    return this.respond(res, await this.auth.tokens(req.actor.userId, member.organizationId));
   }
   @Get('me') @UseGuards(AuthGuard) @ApiBearerAuth() async me(@Req() req: AuthRequest) {
     const user = await this.db.user.findUniqueOrThrow({ where: { id: req.actor.userId }, select: { id: true, name: true, email: true, memberships: { include: { organization: true } } } });

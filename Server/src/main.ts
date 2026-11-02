@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ApiFilter } from './common/api.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET.startsWith('replace-')) throw new Error('Set JWT_SECRET to a random secret of at least 32 characters');
   app.enableCors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:3000', credentials: true });
   app.enableShutdownHooks();
+  app.useGlobalFilters(new ApiFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   // Bounded, expiring per-IP auth limit. Use a shared gateway limit for multiple replicas.
   const attempts = new Map<string, { count: number; reset: number }>();
