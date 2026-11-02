@@ -213,6 +213,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <a href="#main" className="skip-link">
         Skip to content
       </a>
+      {mobile && (
+        <button
+          className="mobile-nav-backdrop"
+          aria-label="Dismiss navigation"
+          onClick={() => setMobile(false)}
+        />
+      )}
       <aside className="sidebar">
         <Link href="/app" className="brand">
           <span className="brand-mark">l</span>

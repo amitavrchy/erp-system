@@ -2,9 +2,10 @@ import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const require = createRequire(import.meta.url);
-const { PrismaClient } =
-  require('../../Server/node_modules/@prisma/client') as typeof import('../../Server/node_modules/@prisma/client');
+const serverRequire = createRequire(path.resolve(process.cwd(), 'package.json'));
+const { PrismaClient } = serverRequire(
+  path.resolve(process.cwd(), '../Server/node_modules/@prisma/client'),
+) as typeof import('../../Server/node_modules/@prisma/client');
 const emails = new Set<string>();
 export const trackEmail = (email: string) => emails.add(email);
 

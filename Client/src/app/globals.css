@@ -493,6 +493,9 @@ kbd {
 .mobile-menu {
   display: none;
 }
+.mobile-nav-backdrop {
+  display: none;
+}
 .module-tabs {
   display: flex;
   gap: 24px;
@@ -1449,6 +1452,14 @@ td .subtext {
   }
 }
 @media (max-width: 760px) {
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 44;
+    background: #0009;
+    border: 0;
+  }
   .shell,
   .shell.collapsed {
     display: block;

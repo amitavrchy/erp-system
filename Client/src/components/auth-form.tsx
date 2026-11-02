@@ -11,6 +11,7 @@ import { api, setToken, errorMessage } from '@/lib/api';
 import { session, activeOrg, type Dispatch } from '@/store';
 import type { Me } from '@/lib/types';
 import { Button } from './ui';
+import { SessionBoundary } from './session-boundary';
 const schema = z.object({
   email: z.email('Enter a valid email').optional(),
   password: z.string().min(10, 'Use at least 10 characters').max(128),
@@ -18,13 +19,15 @@ const schema = z.object({
   organization: z.string().optional(),
 });
 type Values = z.infer<typeof schema>;
-export function AuthForm({
-  mode,
-  token,
-}: {
-  mode: 'login' | 'register' | 'invite';
-  token?: string;
-}) {
+type AuthProps = { mode: 'login' | 'register' | 'invite'; token?: string };
+export function AuthForm(props: AuthProps) {
+  return (
+    <SessionBoundary>
+      <AuthFields {...props} />
+    </SessionBoundary>
+  );
+}
+function AuthFields({ mode, token }: AuthProps) {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const [error, setError] = useState('');

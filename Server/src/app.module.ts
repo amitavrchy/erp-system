@@ -19,7 +19,7 @@ import { HealthController } from './health.controller.js';
     PrismaModule,
     JwtModule.register({}),
   ],
-  controllers: [AppController, AuthController, ErpController, HealthController],
+  controllers: [AppController, AuthController, HealthController, ErpController],
   providers: [
     AppService,
     AuthService,

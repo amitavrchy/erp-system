@@ -85,6 +85,13 @@ async function register(suffix) {
 }
 
 test('production API acceptance', async (t) => {
+  await t.test(
+    'public readiness probe checks the database without authentication',
+    async () => {
+      const health = (await call('/health')).data;
+      assert.equal(health.status, 'ok');
+    },
+  );
   const owner = await register('owner');
   const other = await register('other');
   let company, contact, product, warehouse, vendor, quote, order, invoice, po;

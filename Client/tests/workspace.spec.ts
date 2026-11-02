@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { trackEmail, cleanupBrowserFixtures } from './fixtures';
+import { readFile } from 'node:fs/promises';
 
 test.afterEach(async () => {
   await cleanupBrowserFixtures();
@@ -34,6 +35,13 @@ test('a team can register, sell, receive payments and use the workspace on mobil
   await page.getByLabel('Reorder point').fill('5');
   await page.getByRole('button', { name: 'Create record' }).click();
   await expect(page.getByRole('link', { name: 'Browser desk lamp', exact: true })).toBeVisible();
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const csv = await downloading;
+  expect(csv.suggestedFilename()).toBe('products.csv');
+  const csvPath = await csv.path();
+  expect(csvPath).toBeTruthy();
+  expect(await readFile(csvPath!, 'utf8')).toContain(`BROWSER-${unique}`);
   await page.goto('/app/crm/contacts');
   await page.getByRole('button', { name: 'New contact', exact: true }).click();
   await page.getByLabel('Full name').fill('Browser Customer');
