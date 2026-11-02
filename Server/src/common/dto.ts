@@ -1,46 +1,46 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, Length, IsInt, Min, Max, IsNumber, IsEmail, IsBoolean, IsArray, IsIn, ValidateNested, IsDateString, MaxLength } from 'class-validator';
+import { ValidateIf, IsString, Length, IsInt, Min, Max, IsNumber, IsEmail, IsBoolean, IsArray, IsIn, ValidateNested, IsDateString, MaxLength } from 'class-validator';
 
 export class ListDto {
-  @IsOptional() @IsString() @MaxLength(200) q?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) page = 1;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
-  @IsOptional() @IsIn(['DRAFT','OPEN','SENT','PARTIAL','PAID','VOID','CANCELLED']) status?: string;
-  @IsOptional() @IsIn(['true','false']) low?: string;
-  @IsOptional() @IsDateString() from?: string;
-  @IsOptional() @IsDateString() to?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(200) q?: string;
+  @ValidateIf((_object, value) => value !== undefined) @Type(() => Number) @IsInt() @Min(1) @Max(100000) page = 1;
+  @ValidateIf((_object, value) => value !== undefined) @Type(() => Number) @IsInt() @Min(1) @Max(100) pageSize = 20;
+  @ValidateIf((_object, value) => value !== undefined) @IsIn(['DRAFT','OPEN','SENT','PARTIAL','PAID','VOID','CANCELLED']) status?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsIn(['true','false']) low?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsDateString() from?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsDateString() to?: string;
 }
 export class MasterDto {
-  @IsOptional() @IsString() @Length(2, 120) name?: string;
-  @IsOptional() @IsEmail() email?: string;
-  @IsOptional() @IsString() @MaxLength(40) phone?: string;
-  @IsOptional() @IsString() @MaxLength(120) title?: string;
-  @IsOptional() @IsString() @MaxLength(100) companyId?: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(40, { each: true }) tags?: string[];
-  @IsOptional() @IsString() @MaxLength(300) website?: string;
-  @IsOptional() @IsString() @MaxLength(5000) notes?: string;
-  @IsOptional() @IsString() @Length(1, 60) sku?: string;
-  @IsOptional() @IsString() @MaxLength(5000) description?: string;
-  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100000000) unitPrice?: number;
-  @IsOptional() @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100000000) costPrice?: number;
-  @IsOptional() @IsInt() @Min(0) @Max(1000000) reorderPoint?: number;
-  @IsOptional() @IsBoolean() isActive?: boolean;
-  @IsOptional() @IsString() @Length(1, 40) code?: string;
-  @IsOptional() @IsInt() @Min(0) @Max(10000) rateBps?: number;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @Length(2, 120) name?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsEmail() email?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(40) phone?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(120) title?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) companyId?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsArray() @IsString({ each: true }) @MaxLength(40, { each: true }) tags?: string[];
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(300) website?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(5000) notes?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @Length(1, 60) sku?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(5000) description?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100000000) unitPrice?: number;
+  @ValidateIf((_object, value) => value !== undefined) @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100000000) costPrice?: number;
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(1000000) reorderPoint?: number;
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean() isActive?: boolean;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @Length(1, 40) code?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10000) rateBps?: number;
 }
 export class LineDto {
-  @IsOptional() @IsString() @MaxLength(100) productId?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) productId?: string;
   @IsString() @Length(1, 300) description: string;
   @IsInt() @Min(1) @Max(1000000) quantity: number;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(100000000) unitPrice: number;
-  @IsOptional() @IsInt() @Min(0) @Max(10000) taxBps = 0;
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10000) taxBps = 0;
 }
 export class DocumentDto {
-  @IsOptional() @IsString() @MaxLength(100) contactId?: string;
-  @IsOptional() @IsString() @MaxLength(100) vendorId?: string;
-  @IsOptional() @IsString() @MaxLength(5000) notes?: string;
-  @IsOptional() @IsDateString() dueDate?: string;
-  @IsOptional() @IsDateString() validUntil?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) contactId?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) vendorId?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(5000) notes?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsDateString() dueDate?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsDateString() validUntil?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => LineDto) lines: LineDto[];
 }
 export class AdjustmentDto {
@@ -53,8 +53,8 @@ export class PaymentDto {
   @IsString() invoiceId: string;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0.01) @Max(100000000) amount: number;
   @IsIn(['CASH','CARD','BANK','OTHER']) method: 'CASH' | 'CARD' | 'BANK' | 'OTHER';
-  @IsOptional() @IsDateString() paidAt?: string;
-  @IsOptional() @IsString() @MaxLength(200) reference?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsDateString() paidAt?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(200) reference?: string;
 }
 export class ReceiveLineDto {
   @IsString() lineId: string;

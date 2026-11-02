@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, PanelLeftClose, PanelLeftOpen, Sun, Moon, LogOut, ChevronRight, ArrowUpRight, Menu, X, Command, LoaderCircle, ArrowRight } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen, Sun, Moon, LogOut, ChevronRight, ArrowUpRight, Menu, X, LoaderCircle, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { navigation, documentHref } from '@/lib/modules';
 import { useWorkspace } from '@/hooks/use-workspace';

@@ -41,15 +41,16 @@ export class CatalogService {
     return { data, meta: { page: q.page, pageSize: q.pageSize, total } };
   }
   async get(a: Actor, resource: string, id: string) {
-    const record = await this.delegate(this.db, resource).findFirst({ where: { id, organizationId: a.orgId } });
+    const record = await this.delegate(this.db, resource).findFirst({ where: { id, organizationId: a.orgId }, ...(resource === 'contacts' ? { include: { company: true, quotes: true, salesOrders: true, invoices: true } } : resource === 'products' ? { include: { stockLevels: { include: { warehouse: true } } } } : {}) });
     if (!record) throw new NotFoundException();
     return record;
   }
   async save(a: Actor, resource: string, dto: MasterDto, id?: string) {
     const config = this.config(resource);
     if (!['OWNER','ADMIN', ...config.roles].includes(a.role)) throw new ForbiddenException();
-    const input = Object.fromEntries(Object.entries(dto).filter(([key]) => (config.fields as readonly string[]).includes(key)));
-    if (Object.keys(dto).some(key => !(config.fields as readonly string[]).includes(key))) throw new BadRequestException('Unexpected field for this record type');
+    const supplied = Object.entries(dto).filter(([,value]) => value !== undefined);
+    const input = Object.fromEntries(supplied.filter(([key]) => (config.fields as readonly string[]).includes(key)));
+    if (supplied.some(([key]) => !(config.fields as readonly string[]).includes(key))) throw new BadRequestException('Unexpected field for this record type');
     if (!id && !dto.name) throw new BadRequestException('Name is required');
     if (!id && resource === 'products' && (!dto.sku || dto.unitPrice === undefined)) throw new BadRequestException('SKU and unit price are required');
     if (!id && resource === 'warehouses' && !dto.code) throw new BadRequestException('Warehouse code is required');

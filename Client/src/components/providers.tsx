@@ -23,6 +23,7 @@ function Bootstrap({children}: {children: React.ReactNode}) {
     return () => { live = false; window.removeEventListener('session-expired', expire); };
   },[dispatch]);
   useEffect(() => {
+    if (!ui.hydrated) return;
     document.documentElement.dataset.theme = ui.theme;
     document.documentElement.dataset.density = ui.density;
     try { localStorage.setItem('ledgerflow-ui', JSON.stringify(ui)); } catch { /* Preferences are optional. */ }

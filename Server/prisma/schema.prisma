@@ -50,6 +50,8 @@ enum ActivityType {
 }
 
 model Organization {
+  bills          Bill[]
+  invitations    Invitation[]
   id             String           @id @default(cuid())
   name           String
   slug           String           @unique
@@ -353,6 +355,7 @@ model Vendor {
 }
 
 model PurchaseOrder {
+  bill           Bill?
   id             String              @id @default(cuid())
   organizationId String
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -398,15 +401,17 @@ model AuditLog {
 }
 
 model RefreshSession {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  organizationId String   @default("")
+  id             String   @id @default(cuid())
+  tokenHash      String   @unique
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
 }
 
 model Invitation {
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   id             String         @id @default(cuid())
   organizationId String
   email          String
@@ -420,16 +425,18 @@ model Invitation {
 }
 
 model Bill {
-  id              String    @id @default(cuid())
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  id              String        @id @default(cuid())
   organizationId  String
-  purchaseOrderId String    @unique
+  purchaseOrderId String        @unique
   number          String
   vendorName      String
-  total           Decimal   @db.Decimal(14, 2)
-  amountPaid      Decimal   @default(0) @db.Decimal(14, 2)
-  status          DocStatus @default(OPEN)
+  total           Decimal       @db.Decimal(14, 2)
+  amountPaid      Decimal       @default(0) @db.Decimal(14, 2)
+  status          DocStatus     @default(OPEN)
   dueDate         DateTime
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime      @default(now())
 
   @@unique([organizationId, number])
   @@index([organizationId, status])

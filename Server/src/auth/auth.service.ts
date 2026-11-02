@@ -39,7 +39,7 @@ export class AuthService {
 
   async tokens(userId: string, orgId: string) {
     const refreshToken = randomBytes(48).toString('hex');
-    await this.db.refreshSession.create({ data: { userId, tokenHash: digest(refreshToken), expiresAt: new Date(Date.now() + 7 * 86400000) } });
+    await this.db.refreshSession.create({ data: { userId, organizationId: orgId, tokenHash: digest(refreshToken), expiresAt: new Date(Date.now() + 7 * 86400000) } });
     return { accessToken: await this.jwt.signAsync({ sub: userId, orgId }, { secret: this.config.getOrThrow<string>('JWT_SECRET'), expiresIn: '15m' }), refreshToken };
   }
 
@@ -49,7 +49,9 @@ export class AuthService {
     if (!session || session.expiresAt < new Date() || !session.user.memberships.length) throw new UnauthorizedException();
     const claimed = await this.db.refreshSession.deleteMany({ where: { id: session.id } });
     if (!claimed.count) throw new UnauthorizedException();
-    return this.tokens(session.userId, session.user.memberships[0].organizationId);
+    const membership = session.user.memberships.find(m => m.organizationId === session.organizationId);
+    if (!membership) throw new UnauthorizedException();
+    return this.tokens(session.userId, membership.organizationId);
   }
 
   async logout(token?: string) {

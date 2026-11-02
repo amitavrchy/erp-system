@@ -65,6 +65,24 @@ export class WorkflowsService {
       return order;
     }, { isolationLevel: 'Serializable' });
   }
+  async update(a: Actor, kind: DocKind, id: string, dto: DocumentDto) {
+    this.authorize(a, kind);
+    const sums = totals(dto.lines);
+    return this.db.$transaction(async tx => {
+      const delegate = tx[models[kind]] as unknown as { findFirst(args: object): Promise<{ status: string } | null>; update(args: object): Promise<unknown> };
+      const doc = await delegate.findFirst({ where: { id, organizationId: a.orgId, ...(a.role === 'SALES' ? { createdById: a.userId } : {}) } });
+      if (!doc) throw new NotFoundException();
+      if (kind === 'sales-orders' ? doc.status !== 'OPEN' || await tx.invoice.count({ where: { salesOrderId: id } }) > 0 : doc.status !== 'DRAFT') throw new BadRequestException('Only unprocessed documents can be edited');
+      if (dto.contactId && !(await tx.contact.findFirst({ where: { id: dto.contactId, organizationId: a.orgId } }))) throw new NotFoundException('Contact not found');
+      if (kind === 'purchase-orders' && (!dto.vendorId || !(await tx.vendor.findFirst({ where: { id: dto.vendorId, organizationId: a.orgId } })))) throw new NotFoundException('Vendor not found');
+      for (const line of dto.lines) if (line.productId && !(await tx.product.findFirst({ where: { id: line.productId, organizationId: a.orgId, isActive: true } }))) throw new NotFoundException('Product not found');
+      const lines = dto.lines.map((l,i) => ({ productId: l.productId || null, description: l.description, quantity: l.quantity, unitPrice: l.unitPrice, ...(kind !== 'purchase-orders' ? { taxBps: l.taxBps ?? 0 } : {}), sortOrder: i }));
+      const data = { ...sums, ...(kind === 'purchase-orders' ? { vendorId: dto.vendorId } : { contactId: dto.contactId || null }), ...(kind === 'quotes' ? { notes: dto.notes ?? null, validUntil: dto.validUntil ? new Date(dto.validUntil) : null } : {}), ...(kind === 'invoices' ? { dueDate: dto.dueDate ? new Date(dto.dueDate) : null } : {}), lines: { deleteMany: {}, create: lines } };
+      const updated = await delegate.update({ where: { id, organizationId: a.orgId }, data });
+      await this.audit(tx,a,'document updated',kind,id);
+      return updated;
+    }, { isolationLevel: 'Serializable' });
+  }
   async invoice(a: Actor, id: string) {
     if (!['OWNER','ADMIN','SALES','FINANCE'].includes(a.role)) throw new ForbiddenException();
     return this.db.$transaction(async tx => {

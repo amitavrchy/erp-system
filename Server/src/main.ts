@@ -16,7 +16,8 @@ async function bootstrap() {
   app.use((req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-store');
-    if (req.method === 'POST' && ['/auth/login', '/auth/register'].includes(req.path)) {
+    if (req.method === 'POST' && req.path.startsWith('/auth/') && req.headers.origin && req.headers.origin !== (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')) { res.status(403).json({message:'Untrusted request origin'}); return; }
+    if (req.method === 'POST' && ['/auth/login', '/auth/register', '/auth/accept-invite'].includes(req.path)) {
       const now = Date.now();
       for (const [key, value] of attempts) if (value.reset < now) attempts.delete(key);
       const key = req.ip ?? 'unknown';

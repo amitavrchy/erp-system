@@ -35,6 +35,19 @@ export class ErpController {
     return { url: `${process.env.CLIENT_ORIGIN ?? 'http://localhost:3000'}/invite/${token}`, expiresAt: invitation.expiresAt };
   }
   @Get('reports/dashboard') dashboard(@Req() r: AuthRequest) { return this.reports.dashboard(r.actor); }
+  @Get('reports/accounts') async accounts(@Req() r: AuthRequest) {
+    const where = { organizationId: r.actor.orgId };
+    const [payments, invoices, bills, stock] = await Promise.all([this.db.payment.aggregate({ where, _sum: { amount: true } }), this.db.invoice.findMany({ where: { ...where, status: { in: ['SENT','PARTIAL','PAID'] } } }), this.db.bill.findMany({ where }), this.reports.stock(r.actor, { page: 1, pageSize: 1 })]);
+    const paidOut = bills.reduce((n,b) => n + Number(b.amountPaid),0);
+    return [
+      { code:'1000', name:'Recorded cash movement', type:'Asset', balance:Number(payments._sum.amount??0)-paidOut },
+      { code:'1100', name:'Accounts receivable', type:'Asset', balance:invoices.reduce((n,i)=>n+Number(i.total.sub(i.amountPaid)),0) },
+      { code:'1200', name:'Inventory', type:'Asset', balance:stock.valuation },
+      { code:'2000', name:'Accounts payable', type:'Liability', balance:bills.reduce((n,b)=>n+Number(b.total.sub(b.amountPaid)),0) },
+      { code:'4000', name:'Invoiced sales (before tax)', type:'Revenue', balance:invoices.reduce((n,i)=>n+Number(i.subtotal),0) },
+      { code:'2100', name:'Sales tax invoiced', type:'Liability', balance:invoices.reduce((n,i)=>n+Number(i.taxTotal),0) },
+    ];
+  }
   @Get('reports/ar-aging') aging(@Req() r: AuthRequest) { return this.reports.aging(r.actor); }
   @Get('reports/sales') sales(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.sales(r.actor,q); }
   @Get('stock') stock(@Req() r: AuthRequest, @Query() q: ListDto) { return this.reports.stock(r.actor,q); }
@@ -79,6 +92,7 @@ export class ErpController {
   @Post('invoices/:id/send') @Roles('FINANCE') send(@Req() r:AuthRequest,@Param('id') id:string) { return this.flows.send(r.actor,id); }
   @Post('purchase-orders/:id/receive') @Roles('INVENTORY') receive(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:ReceiveDto) { return this.flows.receive(r.actor,id,dto); }
   @Post(':kind/:id/void') cancel(@Req() r:AuthRequest,@Param('kind') k:string,@Param('id') id:string) { return this.flows.cancel(r.actor,this.kind(k),id); }
+  @Patch(docKinds.map(k=>`${k}/:id`)) updateDoc(@Req() r:AuthRequest,@Param('id') id:string,@Body() dto:DocumentDto) { return this.flows.update(r.actor,this.kind(r.path.split('/')[1]),id,dto); }
 
   @Get(':resource') list(@Req() r:AuthRequest,@Param('resource') resource:string,@Query() q:ListDto) {
     return masters.includes(resource) ? this.catalog.list(r.actor,resource,q) : this.flows.list(r.actor,this.kind(resource),q);
