@@ -1334,6 +1334,9 @@ td .subtext {
   display: grid;
   gap: 18px;
 }
+.auth-form input {
+  font-size: 16px;
+}
 .auth-form .button {
   width: 100%;
   min-height: 44px;

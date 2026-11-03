@@ -1,9 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { useDispatch } from 'react-redux';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
@@ -18,7 +16,6 @@ const schema = z.object({
   name: z.string().optional(),
   organization: z.string().optional(),
 });
-type Values = z.infer<typeof schema>;
 type AuthProps = { mode: 'login' | 'register' | 'invite'; token?: string };
 export function AuthForm(props: AuthProps) {
   return (
@@ -31,15 +28,23 @@ function AuthFields({ mode, token }: AuthProps) {
   const router = useRouter();
   const dispatch = useDispatch<Dispatch>();
   const [error, setError] = useState('');
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema) });
+  const [errors, setErrors] = useState<Record<string, string[] | undefined>>({});
+  const [isSubmitting, setSubmitting] = useState(false);
   const signup = mode === 'register';
   const invite = mode === 'invite';
-  async function submit(v: Values) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isSubmitting) return;
+    // Read native input values at submission, including browser/password-manager autofill.
+    const result = schema.safeParse(Object.fromEntries(new FormData(event.currentTarget)));
     setError('');
+    setErrors({});
+    if (!result.success) {
+      setErrors(z.flattenError(result.error).fieldErrors);
+      return;
+    }
+    const v = result.data;
+    setSubmitting(true);
     try {
       const body = invite
         ? { token, name: v.name, password: v.password }
@@ -57,6 +62,8 @@ function AuthFields({ mode, token }: AuthProps) {
       router.push('/app');
     } catch (e) {
       setError(errorMessage(e));
+    } finally {
+      setSubmitting(false);
     }
   }
   return (
@@ -89,7 +96,7 @@ function AuthFields({ mode, token }: AuthProps) {
                 ? 'Create a workspace for your next chapter.'
                 : 'Your business is right where you left it.'}
           </p>
-          <form onSubmit={handleSubmit(submit)}>
+          <form onSubmit={submit}>
             {error && (
               <div className="form-alert" role="alert">
                 {error}
@@ -98,13 +105,7 @@ function AuthFields({ mode, token }: AuthProps) {
             {(signup || invite) && (
               <label>
                 Your name
-                <input
-                  autoComplete="name"
-                  required
-                  minLength={2}
-                  maxLength={100}
-                  {...register('name')}
-                />
+                <input autoComplete="name" required minLength={2} maxLength={100} name="name" />
               </label>
             )}
             {!invite && (
@@ -113,11 +114,19 @@ function AuthFields({ mode, token }: AuthProps) {
                 <input
                   type="email"
                   required
-                  autoComplete="email"
+                  name="email"
+                  autoComplete={signup ? 'email' : 'username'}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  aria-invalid={Boolean(errors.email)}
+                  aria-describedby={errors.email ? 'auth-email-error' : undefined}
                   placeholder="you@company.com"
-                  {...register('email')}
                 />
-                {errors.email && <span className="field-error">{errors.email.message}</span>}
+                {errors.email && (
+                  <span id="auth-email-error" className="field-error">
+                    {errors.email[0]}
+                  </span>
+                )}
               </label>
             )}
             {signup && (
@@ -129,7 +138,7 @@ function AuthFields({ mode, token }: AuthProps) {
                   minLength={2}
                   maxLength={100}
                   placeholder="Acme Studio"
-                  {...register('organization')}
+                  name="organization"
                 />
               </label>
             )}
@@ -137,11 +146,20 @@ function AuthFields({ mode, token }: AuthProps) {
               Password
               <input
                 type="password"
+                name="password"
+                required
+                minLength={10}
+                maxLength={128}
                 autoComplete={signup || invite ? 'new-password' : 'current-password'}
                 placeholder="At least 10 characters"
-                {...register('password')}
+                aria-invalid={Boolean(errors.password)}
+                aria-describedby={errors.password ? 'auth-password-error' : undefined}
               />
-              {errors.password && <span className="field-error">{errors.password.message}</span>}
+              {errors.password && (
+                <span id="auth-password-error" className="field-error">
+                  {errors.password[0]}
+                </span>
+              )}
             </label>
             <Button type="submit" variant="primary" busy={isSubmitting}>
               {invite ? 'Join workspace' : signup ? 'Create workspace' : 'Sign in'}
