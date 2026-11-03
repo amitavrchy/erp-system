@@ -9,7 +9,7 @@ The connected ERP and expanded CRM suite are implemented and verified locally. N
 | Server type-aware lint and production build | Passed |
 | Unit tests | 3 passed |
 | Real Postgres API acceptance | 34 passed across ERP and CRM suites |
-| Chromium browser acceptance against standalone production client | 2 scenarios passed |
+| Chromium browser acceptance against standalone production client | 4 scenarios passed |
 | Client dependency audit | 0 vulnerabilities |
 | Server dependency audit | 0 vulnerabilities |
 | API Docker image build and runtime smoke | Passed |
@@ -32,6 +32,8 @@ The CRM API suite checks tenant and role restrictions, pipeline configuration, i
 The CRM browser scenario creates a pipeline, required field and automation; converts a lead; creates a quote; moves the deal; completes an automated task; schedules an activity; creates a segment and campaign; resolves a ticket; and imports contacts. It checks white text on light-mode primary buttons, mobile overflow and uncaught page errors. Both this scenario and the original ERP scenario passed against the standalone production client.
 
 Both updated Docker images built successfully. Runtime smoke checks passed for API readiness, bcrypt login, Secure/HttpOnly cookies, authenticated workspace and CRM endpoints, and client HTML/CSS/icon delivery. Both containers use the non-root Node user. Smoke containers were removed; the local preview remains available at `http://localhost:3001` with the API at `http://localhost:4000`.
+
+The subsequent login-input fix passed the client lint and production build, both existing ERP/CRM browser scenarios, and two dedicated desktop/mobile input scenarios. These verify typing, selection, deletion, editing after a rejected sign-in, native autofill values without change events, and 16px auth inputs. A separate browser check successfully signed in to the demo workspace using edited credentials. The Docker checks above predate this client-only fix.
 
 ## Operating boundaries
 
