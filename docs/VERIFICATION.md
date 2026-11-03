@@ -1,6 +1,6 @@
-# Verification — 2 November 2026
+# Verification — 3 November 2026
 
-The connected MVP is implemented and verified locally. No live production deployment was performed, and the remote CI run has not been independently confirmed.
+The connected ERP and expanded CRM suite are implemented and verified locally. No live production deployment was performed, and the remote CI run has not been independently confirmed.
 
 | Check | Result |
 | --- | --- |
@@ -8,8 +8,8 @@ The connected MVP is implemented and verified locally. No live production deploy
 | Client TypeScript and production build | Passed |
 | Server type-aware lint and production build | Passed |
 | Unit tests | 3 passed |
-| Real Postgres API acceptance | 19 passed |
-| Chromium browser acceptance against standalone production client | Passed |
+| Real Postgres API acceptance | 34 passed across ERP and CRM suites |
+| Chromium browser acceptance against standalone production client | 2 scenarios passed |
 | Client dependency audit | 0 vulnerabilities |
 | Server dependency audit | 0 vulnerabilities |
 | API Docker image build and runtime smoke | Passed |
@@ -23,10 +23,20 @@ The browser scenario registers a workspace through the UI, creates a product and
 
 API Docker smoke verification includes anonymous `/health`, bcrypt login, Secure/HttpOnly production cookie attributes and authenticated `/me`. Client Docker smoke verification includes statically prerendered marketing HTML, CSS delivery and the branded icon. Both runtime containers run as the non-root Node user.
 
-A separate empty database applied all four committed migrations and seeded 12 products, 8 contacts and 14 quotes. Seeded dashboard results matched: revenue **$2,629.00**, open AR **$2,247.30**, **3** stock alerts and **4** pending quotes. Running the seed again kept the existing workspace. The temporary bootstrap database and earlier browser fixtures were removed afterward.
+A separate empty database applied all five committed migrations and both demo seeds. The CRM seed produced **12 leads**, **10 deals** and **4 support tickets**. Repeating the CRM seed preserved existing data. The demo CRM summary matched **8 open deals**, **$84,400** pipeline value, **$34,525** weighted forecast, **$18,900** won value and **50%** win rate. Base ERP money and stock were preserved. The temporary bootstrap database and interrupted browser fixtures were removed afterward.
+
+## CRM expansion verification
+
+The CRM API suite checks tenant and role restrictions, pipeline configuration, immutable historical stages, required custom fields, transactional task automation, repeat-safe lead conversion and quote handoff, loss reasons, task completion/reopening, calendar ranges, support deadlines and resolutions, audience segments, campaign persistence, duplicate-safe CSV imports, analytics and audit records. It also checks required fields during import/conversion and conversion retries when earlier opportunities already exist.
+
+The CRM browser scenario creates a pipeline, required field and automation; converts a lead; creates a quote; moves the deal; completes an automated task; schedules an activity; creates a segment and campaign; resolves a ticket; and imports contacts. It checks white text on light-mode primary buttons, mobile overflow and uncaught page errors. Both this scenario and the original ERP scenario passed against the standalone production client.
+
+Both updated Docker images built successfully. Runtime smoke checks passed for API readiness, bcrypt login, Secure/HttpOnly cookies, authenticated workspace and CRM endpoints, and client HTML/CSS/icon delivery. Both containers use the non-root Node user. Smoke containers were removed; the local preview remains available at `http://localhost:3001` with the API at `http://localhost:4000`.
 
 ## Operating boundaries
 
 Email delivery, Stripe, manufacturing, FX and full double-entry accounting remain the specification's stretch scope. Browser printing is available; server-generated PDF delivery is not enabled. Templates are saved for future delivery integration. Vendor bill payment records an external payment. Reports use the documented simplified accounting and current-cost assumptions.
+
+CRM campaigns plan work and support replies record conversations. External messaging, telephony, calendar synchronization, scheduled sequences and advanced SLA escalation are not connected. See the [CRM feature matrix](CRM_SUITE.md) for the implemented scope and integration boundaries.
 
 Production requires an operator-selected HTTPS host, real secrets, database backups and monitoring. Money and stock requests return a conflict when concurrent writes cannot safely commit; inspect current state before manually retrying an uncertain payment or adjustment. See [deployment guidance](DEPLOYMENT.md).

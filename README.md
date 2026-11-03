@@ -6,6 +6,7 @@ A connected ERP workspace for small and growing teams. Built with Next.js 16, Re
 
 - Organization registration, sign-in, rotating HTTP-only refresh sessions, workspace switching, invitations and roles.
 - CRM companies and contacts, tags, connected documents, notes and activity.
+- A connected [CRM suite](docs/CRM_SUITE.md): leads, multiple deal pipelines, tasks, calendar, campaigns, segments, support tickets, custom fields, task automation and analytics.
 - Products with text attributes, warehouses, stock adjustments, low stock and a movement ledger.
 - Quotes → sales orders → invoices → partial/full payments, plus order shipping.
 - Purchase orders → partial/full receiving → stock movements → vendor bills and recorded bill payment.
@@ -24,6 +25,7 @@ npm ci
 docker compose up -d
 npm run db:migrate
 npm run seed
+npm run seed:crm
 npm run start:dev
 ```
 
@@ -53,7 +55,7 @@ npm run test:integration
 npm audit
 ```
 
-The integration suite starts an isolated API port (4101), creates its own tenants, tests validation, cross-tenant access, document conversion, partial payments and receipts, stock, roles, session rotation, settings and concurrent payments, then removes its fixtures. `npm run test:e2e` is an alias for that suite.
+The integration suites start isolated API ports (4101 for ERP, 4102 for CRM), create their own tenants, test validation, cross-tenant access, sales and support workflows, document conversion, partial payments and receipts, stock, roles, session rotation, settings and concurrent payments, then remove their fixtures. `npm run test:e2e` is an alias for those suites.
 
 With the API and client running at the origins above:
 
@@ -76,11 +78,14 @@ Browser tests default to `http://localhost:3001`; set `PLAYWRIGHT_BASE_URL` if y
 - `Client/src/hooks`: organization-scoped React Query hooks.
 - `Server/src/auth`: authentication, membership lookup and role guard.
 - `Server/src/erp`: catalog, transactional workflows, reports and REST controllers.
+- `Server/src/crm`: sales, campaign planning, support, custom fields and task automation.
 - `Server/prisma`: schema, committed migrations and demo seed.
 - `docs`: specification, acceptance results and deployment guidance.
 
 ## Scope
 
 This is the specification's connected MVP, with simplified accounts and vendor bills. Email delivery, server-generated PDFs, Stripe, manufacturing, FX and full double-entry accounting are stretch integrations and are not enabled. Issuing an invoice changes its accounting status; it does not send an email. Printing uses the browser print dialog. Vendor bill payment records an external payment; it does not move money.
+
+The CRM has been expanded beyond the original contacts/companies MVP. Campaign drafts and recorded support replies are available; external delivery providers remain unconnected. See the [CRM feature matrix and boundaries](docs/CRM_SUITE.md).
 
 See [deployment guidance](docs/DEPLOYMENT.md) before operating a production instance and [verification notes](docs/VERIFICATION.md) for the tested release.
